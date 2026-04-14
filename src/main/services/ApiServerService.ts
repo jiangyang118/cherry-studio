@@ -1,3 +1,4 @@
+import { API_SERVER_DEFAULTS } from '@shared/config/constant'
 import { IpcChannel } from '@shared/IpcChannel'
 import type {
   ApiServerConfig,
@@ -11,6 +12,7 @@ import { ipcMain } from 'electron'
 import { apiServer } from '../apiServer'
 import { config } from '../apiServer/config'
 import { loggerService } from './LoggerService'
+import { formatApiServerError } from './utils/apiServerErrors'
 const logger = loggerService.withContext('ApiServerService')
 
 export class ApiServerService {
@@ -23,8 +25,13 @@ export class ApiServerService {
       await apiServer.start()
       logger.info('API Server started successfully')
     } catch (error: any) {
-      logger.error('Failed to start API Server:', error)
-      throw error
+      const currentConfig = await this.getCurrentConfig().catch(() => ({
+        host: API_SERVER_DEFAULTS.HOST,
+        port: API_SERVER_DEFAULTS.PORT
+      }))
+      const normalizedError = formatApiServerError(error, currentConfig)
+      logger.error('Failed to start API Server:', normalizedError)
+      throw normalizedError
     }
   }
 
@@ -43,8 +50,13 @@ export class ApiServerService {
       await apiServer.restart()
       logger.info('API Server restarted successfully')
     } catch (error: any) {
-      logger.error('Failed to restart API Server:', error)
-      throw error
+      const currentConfig = await this.getCurrentConfig().catch(() => ({
+        host: API_SERVER_DEFAULTS.HOST,
+        port: API_SERVER_DEFAULTS.PORT
+      }))
+      const normalizedError = formatApiServerError(error, currentConfig)
+      logger.error('Failed to restart API Server:', normalizedError)
+      throw normalizedError
     }
   }
 

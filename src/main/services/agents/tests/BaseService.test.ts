@@ -42,6 +42,10 @@ class TestBaseService extends BaseService {
   public resolve(paths: string[] | undefined, id: string): string[] {
     return this.resolveAccessiblePaths(paths, id)
   }
+
+  public deserialize(data: unknown): unknown {
+    return this.deserializeJsonFields(data)
+  }
 }
 
 const buildMcpTool = (id: string): Tool => ({
@@ -175,5 +179,32 @@ describe('BaseService.resolveAccessiblePaths', () => {
   it('passes through provided paths unchanged', () => {
     // Use path.normalize to get platform-appropriate path format for comparison
     expect(service.resolve(['/some/path'], testId)).toEqual([path.normalize('/some/path')])
+  })
+})
+
+describe('BaseService.deserializeJsonFields', () => {
+  const service = new TestBaseService()
+
+  it('treats empty-string JSON fields as undefined for backward compatibility', () => {
+    const result = service.deserialize({
+      mcps: '',
+      allowed_tools: '',
+      configuration: '{"permission_mode":"default","max_turns":100,"env_vars":{}}',
+      accessible_paths: '["/tmp/workspace"]'
+    }) as {
+      mcps?: string[]
+      allowed_tools?: string[]
+      configuration?: { permission_mode: string }
+      accessible_paths?: string[]
+    }
+
+    expect(result.mcps).toBeUndefined()
+    expect(result.allowed_tools).toBeUndefined()
+    expect(result.configuration).toEqual({
+      permission_mode: 'default',
+      max_turns: 100,
+      env_vars: {}
+    })
+    expect(result.accessible_paths).toEqual(['/tmp/workspace'])
   })
 })

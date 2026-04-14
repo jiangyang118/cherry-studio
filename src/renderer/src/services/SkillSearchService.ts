@@ -15,6 +15,56 @@ const CLAWHUB_API = 'https://clawhub.ai/api/v1/search'
 
 const REQUEST_TIMEOUT_MS = 15_000
 
+function normalizeGitHubUrl(input: string): URL | null {
+  try {
+    const url = new URL(input.trim())
+    if (url.hostname !== 'github.com') return null
+    return url
+  } catch {
+    return null
+  }
+}
+
+function normalizeGitHubQuery(query: string): SkillSearchResult[] {
+  const url = normalizeGitHubUrl(query)
+  if (!url) return []
+
+  const segments = url.pathname.split('/').filter(Boolean)
+  if (segments.length < 2) return []
+
+  const owner = segments[0]
+  const repoRaw = segments[1]
+  const mode = segments[2]
+  const ref = segments[3]
+  const rest = segments.slice(4)
+  const repo = repoRaw.replace(/\.git$/i, '')
+  if (!owner || !repo) return []
+
+  let inferredPath = ''
+  if (mode === 'tree' && ref && rest.length > 0) {
+    inferredPath = rest.join('/')
+  } else if (mode === 'blob' && ref && rest.length > 0) {
+    inferredPath = rest.slice(0, -1).join('/')
+  }
+
+  const label = inferredPath ? `${repo}/${inferredPath.split('/').at(-1)}` : repo
+  const sourceUrl = `${url.origin}${url.pathname}`
+
+  return [
+    {
+      slug: `${owner}/${repo}${inferredPath ? `:${inferredPath}` : ''}`,
+      name: label,
+      description: inferredPath || `${url.origin}${url.pathname}`,
+      author: owner,
+      stars: 0,
+      downloads: 0,
+      sourceRegistry: 'github.com',
+      sourceUrl,
+      installSource: `github:${encodeURIComponent(sourceUrl)}`
+    }
+  ]
+}
+
 // ===========================================================================
 // Normalizers: source-specific response → unified SkillSearchResult[]
 // ===========================================================================
@@ -133,6 +183,11 @@ async function searchClawhub(query: string): Promise<SkillSearchResult[]> {
  */
 export async function searchSkills(query: string): Promise<SkillSearchResult[]> {
   if (!query.trim()) return []
+
+  const directGitHubMatches = normalizeGitHubQuery(query)
+  if (directGitHubMatches.length > 0) {
+    return directGitHubMatches
+  }
 
   const sources = [
     searchSkillsSh(query).catch((err) => {

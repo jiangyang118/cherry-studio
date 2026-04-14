@@ -175,6 +175,11 @@ export abstract class BaseService {
     const deserialized = { ...data }
 
     for (const field of this.jsonFields) {
+      if (deserialized[field] === '') {
+        deserialized[field] = undefined
+        continue
+      }
+
       if (deserialized[field] && typeof deserialized[field] === 'string') {
         try {
           deserialized[field] = JSON.parse(deserialized[field])

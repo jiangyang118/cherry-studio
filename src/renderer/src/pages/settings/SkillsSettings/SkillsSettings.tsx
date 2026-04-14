@@ -41,7 +41,7 @@ import styled from 'styled-components'
 const { Dragger } = Upload
 
 const TITLE_STYLE = { fontWeight: 500 } as const
-const SEARCH_SOURCES: SkillSearchSource[] = ['claude-plugins.dev', 'skills.sh', 'clawhub.ai']
+const SEARCH_SOURCES: SkillSearchSource[] = ['claude-plugins.dev', 'skills.sh', 'clawhub.ai', 'github.com']
 const MARKDOWN_EXTENSIONS = new Set(['.md', '.mdx', '.markdown'])
 const ICON_STYLE_16 = { fontSize: 16, flexShrink: 0 } as const
 const SPACER_STYLE = { width: 12, flexShrink: 0 } as const
@@ -320,6 +320,12 @@ const SkillsSettings: FC = () => {
   const filteredResults = useMemo(() => {
     return results.filter((r) => r.sourceRegistry === searchTab)
   }, [results, searchTab])
+
+  useEffect(() => {
+    if (!searchQuery.trim() || searching || results.length === 0) return
+    if (results.some((r) => r.sourceRegistry === searchTab)) return
+    setSearchTab(results[0].sourceRegistry)
+  }, [results, searchQuery, searchTab, searching])
 
   // Pre-compute tab counts in one pass (js-combine-iterations)
   const tabCounts = useMemo(() => {

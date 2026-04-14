@@ -8,6 +8,7 @@ import GeneralSettingsPanel from '../components/KnowledgeSettings/GeneralSetting
 // Mock dependencies
 const mocks = vi.hoisted(() => ({
   t: vi.fn((key: string) => key),
+  navigate: vi.fn(),
   providers: [
     {
       id: 'openai',
@@ -21,7 +22,23 @@ const mocks = vi.hoisted(() => ({
         }
       ]
     }
-  ],
+  ] as any[],
+  allProviders: [
+    {
+      id: 'openai',
+      name: 'OpenAI',
+      apiKey: '',
+      enabled: false,
+      models: [
+        {
+          id: 'text-embedding-3-small',
+          provider: 'openai',
+          name: 'text-embedding-3-small',
+          group: 'embedding'
+        }
+      ]
+    }
+  ] as any[],
   handlers: {
     handleEmbeddingModelChange: vi.fn(),
     handleDimensionChange: vi.fn()
@@ -39,7 +56,7 @@ vi.mock('@renderer/components/TooltipIcons', () => ({
 
 // Mock ModelSelector component
 vi.mock('@renderer/components/ModelSelector', () => ({
-  default: ({ value, onChange, placeholder, allowClear, providers }: any) => {
+  default: ({ value, onChange, placeholder, allowClear, providers, disabled }: any) => {
     // Use providers parameter to avoid lint error
     const hasProviders = providers && providers.length > 0
 
@@ -50,7 +67,8 @@ vi.mock('@renderer/components/ModelSelector', () => ({
         onChange={(e) => onChange?.(e.target.value)}
         data-placeholder={placeholder}
         data-allow-clear={allowClear}
-        data-has-providers={hasProviders}>
+        data-has-providers={hasProviders}
+        disabled={disabled}>
         <option value="">Select model</option>
         <option value="openai/text-embedding-3-small">text-embedding-3-small</option>
         <option value="openai/text-embedding-ada-002">text-embedding-ada-002</option>
@@ -75,7 +93,8 @@ vi.mock('@renderer/components/InputEmbeddingDimension', () => ({
 
 // Mock useProviders hook
 vi.mock('@renderer/hooks/useProvider', () => ({
-  useProviders: () => ({ providers: mocks.providers })
+  useProviders: () => ({ providers: mocks.providers }),
+  useAllProviders: () => mocks.allProviders
 }))
 
 // Mock ModelService
@@ -98,8 +117,17 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: mocks.t })
 }))
 
+Object.assign(window, {
+  navigate: mocks.navigate
+})
+
 // Mock antd components
 vi.mock('antd', () => ({
+  Button: ({ children, onClick }: any) => (
+    <button data-testid="navigate-provider-settings" type="button" onClick={onClick}>
+      {children}
+    </button>
+  ),
   Input: ({ value, onChange, placeholder }: any) => (
     <input data-testid="name-input" value={value} onChange={onChange} placeholder={placeholder} />
   ),
@@ -162,12 +190,41 @@ describe('GeneralSettingsPanel', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.providers.splice(0, mocks.providers.length, {
+      id: 'openai',
+      name: 'OpenAI',
+      models: [
+        {
+          id: 'text-embedding-3-small',
+          provider: 'openai',
+          name: 'text-embedding-3-small',
+          group: 'embedding'
+        }
+      ]
+    } as any)
+    mocks.allProviders.splice(0, mocks.allProviders.length, {
+      id: 'openai',
+      name: 'OpenAI',
+      apiKey: '',
+      enabled: false,
+      models: [
+        {
+          id: 'text-embedding-3-small',
+          provider: 'openai',
+          name: 'text-embedding-3-small',
+          group: 'embedding'
+        }
+      ]
+    } as any)
   })
 
   describe('basic rendering', () => {
-    it('should match snapshot', () => {
-      const { container } = renderComponent()
-      expect(container.firstChild).toMatchSnapshot()
+    it('should render embedding label, tooltip, and provider settings action', () => {
+      renderComponent()
+
+      expect(screen.getByText('models.embedding_model')).toBeInTheDocument()
+      expect(screen.getByTitle('models.embedding_model_tooltip')).toBeInTheDocument()
+      expect(screen.getByTestId('navigate-provider-settings')).toBeInTheDocument()
     })
   })
 
@@ -191,6 +248,14 @@ describe('GeneralSettingsPanel', () => {
       // Test embedding model change
       await user.selectOptions(modelSelector, 'openai/text-embedding-ada-002')
       expect(mocks.handlers.handleEmbeddingModelChange).toHaveBeenCalledWith('openai/text-embedding-ada-002')
+    })
+
+    it('should always show provider settings action', async () => {
+      const user = userEvent.setup()
+      renderComponent()
+
+      await user.click(screen.getByTestId('navigate-provider-settings'))
+      expect(mocks.navigate).toHaveBeenCalledWith('/settings/provider?id=openai')
     })
 
     it('should handle dimension change', async () => {
@@ -217,6 +282,50 @@ describe('GeneralSettingsPanel', () => {
 
       const dimensionInput = screen.getByTestId('embedding-dimension-input')
       expect(dimensionInput).toBeDisabled()
+    })
+
+    it('should show navigation helper when no embedding models are available', async () => {
+      mocks.providers.splice(0, mocks.providers.length, {
+        id: 'minimax-global',
+        name: 'MiniMax Global',
+        models: [{ id: 'MiniMax-M2', provider: 'minimax-global', name: 'MiniMax-M2', group: 'M2' }]
+      } as any)
+      mocks.allProviders.splice(
+        0,
+        mocks.allProviders.length,
+        {
+          id: 'minimax-global',
+          name: 'MiniMax Global',
+          apiKey: 'sk-test',
+          enabled: true,
+          models: [{ id: 'MiniMax-M2', provider: 'minimax-global', name: 'MiniMax-M2', group: 'M2' }]
+        } as any,
+        {
+          id: 'openai',
+          name: 'OpenAI',
+          apiKey: '',
+          enabled: false,
+          models: [
+            {
+              id: 'text-embedding-3-small',
+              provider: 'openai',
+              name: 'text-embedding-3-small',
+              group: 'embedding'
+            }
+          ]
+        } as any
+      )
+
+      const user = userEvent.setup()
+      renderComponent({ newBase: createKnowledgeBase({ model: undefined as any }) })
+
+      expect(screen.getByText('models.embedding_model_tooltip')).toBeInTheDocument()
+
+      const modelSelector = screen.getByTestId('model-selector')
+      expect(modelSelector).toBeDisabled()
+
+      await user.click(screen.getByTestId('navigate-provider-settings'))
+      expect(mocks.navigate).toHaveBeenCalledWith('/settings/provider?id=openai')
     })
   })
 })

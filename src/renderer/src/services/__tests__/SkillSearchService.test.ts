@@ -4,8 +4,9 @@ import {
   ClawhubSkillDetailSchema,
   SkillsShSearchResponseSchema
 } from '@types'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
+import { searchSkills } from '../SkillSearchService'
 import claudePluginsFixture from './fixtures/claude-plugins-search.json'
 import clawhubDetailFixture from './fixtures/clawhub-detail.json'
 import clawhubSearchFixture from './fixtures/clawhub-search.json'
@@ -135,6 +136,26 @@ describe('Skill search API schemas', () => {
         expect(result.data.moderation).toBeNull()
       }
     })
+  })
+})
+
+describe('searchSkills', () => {
+  it('should return a direct GitHub install result without hitting registries', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+
+    const results = await searchSkills('https://github.com/anthropic/skills/tree/main/code-review')
+
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(results).toHaveLength(1)
+    expect(results[0]).toMatchObject({
+      name: 'skills/code-review',
+      author: 'anthropic',
+      sourceRegistry: 'github.com',
+      sourceUrl: 'https://github.com/anthropic/skills/tree/main/code-review',
+      installSource: `github:${encodeURIComponent('https://github.com/anthropic/skills/tree/main/code-review')}`
+    })
+
+    fetchSpy.mockRestore()
   })
 })
 

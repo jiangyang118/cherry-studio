@@ -24,8 +24,7 @@ const ApiServerSettings: FC = () => {
 
   // API Server state with proper defaults
   const apiServerConfig = useSelector((state: RootState) => state.settings.apiServer)
-  const { apiServerRunning, apiServerLoading, startApiServer, stopApiServer, restartApiServer, setApiServerEnabled } =
-    useApiServer()
+  const { apiServerRunning, apiServerLoading, startApiServer, stopApiServer, restartApiServer } = useApiServer()
 
   const handleApiServerToggle = async (enabled: boolean) => {
     try {
@@ -36,8 +35,6 @@ const ApiServerSettings: FC = () => {
       }
     } catch (error) {
       window.toast.error(t('apiServer.messages.operationFailed') + formatErrorMessage(error))
-    } finally {
-      setApiServerEnabled(enabled)
     }
   }
 

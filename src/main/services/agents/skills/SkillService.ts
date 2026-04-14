@@ -169,6 +169,8 @@ export class SkillService {
         return this.installFromSkillsSh(identifier)
       case 'clawhub':
         return this.installFromClawhub(identifier)
+      case 'github':
+        return this.installFromGitHub(decodeURIComponent(identifier))
       default:
         throw new Error(`Unknown install source: ${source}`)
     }
@@ -381,6 +383,20 @@ export class SkillService {
     }
   }
 
+  private async installFromGitHub(input: string): Promise<InstalledSkill> {
+    const parsed = this.parseGitHubSource(input)
+    const tempDir = await this.createTempDir('github')
+
+    try {
+      await this.cloneRepository(parsed.repoUrl, tempDir)
+      const skillName = parsed.directoryPath ? path.basename(parsed.directoryPath) : null
+      const skillDir = await this.resolveSkillDirectory(tempDir, skillName, parsed.directoryPath)
+      return await this.installSkillDir(skillDir, 'marketplace', parsed.sourceUrl)
+    } finally {
+      await this.safeRemoveDirectory(tempDir)
+    }
+  }
+
   // ===========================================================================
   // Core install logic
   // ===========================================================================
@@ -578,6 +594,52 @@ export class SkillService {
     if (rootSkill) return repoDir
 
     throw new Error(`No skill directory found in ${repoDir}`)
+  }
+
+  private parseGitHubSource(input: string): { repoUrl: string; directoryPath: string | null; sourceUrl: string } {
+    let url: URL
+
+    try {
+      url = new URL(input)
+    } catch {
+      throw new Error(`Invalid GitHub URL: ${input}`)
+    }
+
+    if (url.hostname !== 'github.com') {
+      throw new Error(`Only github.com URLs are supported: ${input}`)
+    }
+
+    const segments = url.pathname.split('/').filter(Boolean)
+    if (segments.length < 2) {
+      throw new Error(`GitHub URL must include owner and repository: ${input}`)
+    }
+
+    const owner = segments[0]
+    const repoRaw = segments[1]
+    const mode = segments[2]
+    const rest = segments.slice(4)
+    const repo = repoRaw.replace(/\.git$/i, '')
+    if (!owner || !repo) {
+      throw new Error(`Invalid GitHub repository URL: ${input}`)
+    }
+
+    let directoryPath: string | null = null
+    if (mode === 'tree') {
+      directoryPath = rest.length > 0 ? rest.join('/') : null
+    } else if (mode === 'blob') {
+      directoryPath = rest.length > 1 ? rest.slice(0, -1).join('/') : null
+    } else if (mode && mode !== 'tree' && mode !== 'blob') {
+      throw new Error(`Unsupported GitHub URL format: ${input}`)
+    }
+
+    const repoUrl = `https://github.com/${owner}/${repo}`
+    const sourceUrl = `${url.origin}${url.pathname}`
+
+    return {
+      repoUrl,
+      directoryPath,
+      sourceUrl
+    }
   }
 
   // ===========================================================================

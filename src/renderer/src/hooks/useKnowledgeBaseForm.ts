@@ -1,4 +1,5 @@
 import { getEmbeddingMaxContext } from '@renderer/config/embedings'
+import { isEmbeddingModel } from '@renderer/config/models'
 import { usePreprocessProviders } from '@renderer/hooks/usePreprocess'
 import { useProviders } from '@renderer/hooks/useProvider'
 import { getModelUniqId } from '@renderer/services/ModelService'
@@ -40,12 +41,22 @@ export const useKnowledgeBaseForm = (base?: KnowledgeBase) => {
   const [newBase, setNewBase] = useState<KnowledgeBase>(base || createInitialKnowledgeBase())
   const { providers } = useProviders()
   const { preprocessProviders } = usePreprocessProviders()
+  const defaultEmbeddingModel = useMemo(
+    () => providers.flatMap((provider) => provider.models).find((model) => isEmbeddingModel(model)),
+    [providers]
+  )
 
   useEffect(() => {
     if (base) {
       setNewBase(base)
     }
   }, [base])
+
+  useEffect(() => {
+    if (!base && !newBase.model && defaultEmbeddingModel) {
+      setNewBase((prev) => ({ ...prev, model: defaultEmbeddingModel }))
+    }
+  }, [base, defaultEmbeddingModel, newBase.model])
 
   const selectedDocPreprocessProvider = useMemo(
     () => newBase.preprocessProvider?.provider,

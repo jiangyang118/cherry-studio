@@ -13,6 +13,7 @@ import { NotificationProvider } from './context/NotificationProvider'
 import StyleSheetManager from './context/StyleSheetManager'
 import { ThemeProvider } from './context/ThemeProvider'
 import Router from './Router'
+import { useSeedSkillAssistants } from './services/SkillAssistantSeedService'
 
 const logger = loggerService.withContext('App.tsx')
 
@@ -26,6 +27,11 @@ const queryClient = new QueryClient({
   }
 })
 
+function SkillAssistantSeed(): null {
+  useSeedSkillAssistants()
+  return null
+}
+
 function App(): React.ReactElement {
   logger.info('App initialized')
 
@@ -38,6 +44,7 @@ function App(): React.ReactElement {
               <NotificationProvider>
                 <CodeStyleProvider>
                   <PersistGate loading={null} persistor={persistor}>
+                    <SkillAssistantSeed />
                     <TopViewContainer>
                       <Router />
                     </TopViewContainer>
