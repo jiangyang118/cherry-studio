@@ -451,6 +451,15 @@ export enum IpcChannel {
   OpenClaw_CheckUpdate = 'openclaw:check-update',
   OpenClaw_PerformUpdate = 'openclaw:perform-update',
 
+  // Hermes
+  Hermes_CheckInstalled = 'hermes:check-installed',
+  Hermes_StartGateway = 'hermes:start-gateway',
+  Hermes_StopGateway = 'hermes:stop-gateway',
+  Hermes_GetStatus = 'hermes:get-status',
+  Hermes_CheckHealth = 'hermes:check-health',
+  Hermes_GetPlatforms = 'hermes:get-platforms',
+  Hermes_GetDocsUrl = 'hermes:get-docs-url',
+
   // Analytics
   Analytics_TrackTokenUsage = 'analytics:track-token-usage'
 }

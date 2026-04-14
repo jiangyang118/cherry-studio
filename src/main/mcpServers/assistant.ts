@@ -15,6 +15,7 @@ const ALLOWED_ROUTES = [
   '/settings/',
   '/agents',
   '/knowledge',
+  '/hermes',
   '/openclaw',
   '/paintings',
   '/translate',

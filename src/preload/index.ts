@@ -78,6 +78,33 @@ interface OpenClawChannelInfo {
   status: 'connected' | 'disconnected' | 'error'
 }
 
+type HermesGatewayStatus = 'stopped' | 'starting' | 'running' | 'error'
+
+interface HermesInstallInfo {
+  available: boolean
+  repoPath: string
+  venvPath: string | null
+  cliPath: string | null
+  hermesHome: string
+  issues: string[]
+}
+
+interface HermesPlatformInfo {
+  id: string
+  name: string
+  status: 'connected' | 'disconnected' | 'error'
+  errorMessage?: string
+}
+
+interface HermesHealthInfo {
+  status: 'healthy' | 'unhealthy'
+  gatewayState: string | null
+  exitReason: string | null
+  updatedAt: string | null
+  pid: number | null
+  platforms: HermesPlatformInfo[]
+}
+
 type DirectoryListOptions = {
   recursive?: boolean
   maxDepth?: number
@@ -834,6 +861,20 @@ const api = {
       message?: string
     }> => ipcRenderer.invoke(IpcChannel.OpenClaw_CheckUpdate),
     performUpdate: (): Promise<OperationResult> => ipcRenderer.invoke(IpcChannel.OpenClaw_PerformUpdate)
+  },
+  hermes: {
+    checkInstalled: (): Promise<HermesInstallInfo> => ipcRenderer.invoke(IpcChannel.Hermes_CheckInstalled),
+    startGateway: (): Promise<OperationResult> => ipcRenderer.invoke(IpcChannel.Hermes_StartGateway),
+    stopGateway: (): Promise<OperationResult> => ipcRenderer.invoke(IpcChannel.Hermes_StopGateway),
+    getStatus: (): Promise<{
+      status: HermesGatewayStatus
+      mode: string | null
+      pid: number | null
+      message?: string
+    }> => ipcRenderer.invoke(IpcChannel.Hermes_GetStatus),
+    checkHealth: (): Promise<HermesHealthInfo> => ipcRenderer.invoke(IpcChannel.Hermes_CheckHealth),
+    getPlatforms: (): Promise<HermesPlatformInfo[]> => ipcRenderer.invoke(IpcChannel.Hermes_GetPlatforms),
+    getDocsUrl: (): Promise<string> => ipcRenderer.invoke(IpcChannel.Hermes_GetDocsUrl)
   },
   analytics: {
     trackTokenUsage: (data: TokenUsageData) => ipcRenderer.invoke(IpcChannel.Analytics_TrackTokenUsage, data)

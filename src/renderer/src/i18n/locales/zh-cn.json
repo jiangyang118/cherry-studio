@@ -1903,6 +1903,50 @@
     },
     "title": "GPUStack"
   },
+  "hermes": {
+    "actions": {
+      "open_home": "打开 Hermes 主目录",
+      "open_repo": "打开仓库",
+      "refresh": "刷新",
+      "start": "启动 Hermes Gateway",
+      "stop": "停止 Hermes Gateway",
+      "view_docs": "查看文档"
+    },
+    "checking_installation": "正在检查 Hermes 本地接入状态...",
+    "description": "把 099-github 里的本地 hermes-agent 仓库接入 Cherry Studio。此页面会检测可编辑虚拟环境、展示 Hermes gateway 运行状态，并允许你直接启动或停止本地消息网关。",
+    "fields": {
+      "cli_path": "CLI 路径",
+      "exit_reason": "退出原因",
+      "gateway_state": "网关状态",
+      "hermes_home": "Hermes 主目录",
+      "issues": "检测问题",
+      "mode": "运行模式",
+      "pid": "进程 PID",
+      "platforms": "消息平台",
+      "repo_path": "仓库路径",
+      "updated_at": "更新时间",
+      "venv_path": "虚拟环境"
+    },
+    "health": {
+      "no_platforms": "暂时还没有连接的消息平台"
+    },
+    "mode": {
+      "manual": "手动进程",
+      "service": "后台服务",
+      "unknown": "未知"
+    },
+    "not_detected": {
+      "description": "Cherry Studio 没有找到可用的本地 Hermes 仓库。请确认 /Users/jack/code/099-github/hermes-agent 存在，并且虚拟环境中已经安装了 hermes CLI。",
+      "title": "Hermes 仓库尚未就绪"
+    },
+    "sections": {
+      "gateway": "网关运行状态",
+      "local_repo": "本地仓库",
+      "platforms": "消息平台",
+      "quick_actions": "快捷操作"
+    },
+    "title": "Hermes"
+  },
   "history": {
     "continue_chat": "继续聊天",
     "error": {
@@ -5849,6 +5893,7 @@
     "apps": "小程序",
     "code": "Code",
     "files": "文件",
+    "hermes": "Hermes",
     "home": "首页",
     "knowledge": "知识库",
     "launchpad": "启动台",

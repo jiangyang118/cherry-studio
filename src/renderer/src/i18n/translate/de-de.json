@@ -1903,6 +1903,50 @@
     },
     "title": "GPUStack"
   },
+  "hermes": {
+    "actions": {
+      "open_home": "[to be translated]:Open Hermes Home",
+      "open_repo": "[to be translated]:Open Repository",
+      "refresh": "[to be translated]:Refresh",
+      "start": "[to be translated]:Start Hermes Gateway",
+      "stop": "[to be translated]:Stop Hermes Gateway",
+      "view_docs": "[to be translated]:View Documentation"
+    },
+    "checking_installation": "[to be translated]:Checking Hermes local integration...",
+    "description": "[to be translated]:Connect the local hermes-agent repository in 099-github to Cherry Studio. This page detects the editable virtual environment, surfaces Hermes gateway runtime state, and lets you start or stop the local messaging gateway.",
+    "fields": {
+      "cli_path": "[to be translated]:CLI Path",
+      "exit_reason": "[to be translated]:Exit Reason",
+      "gateway_state": "[to be translated]:Gateway State",
+      "hermes_home": "[to be translated]:Hermes Home",
+      "issues": "[to be translated]:Detection Issues",
+      "mode": "[to be translated]:Run Mode",
+      "pid": "[to be translated]:PID",
+      "platforms": "[to be translated]:Platforms",
+      "repo_path": "[to be translated]:Repository Path",
+      "updated_at": "[to be translated]:Updated At",
+      "venv_path": "[to be translated]:Virtual Environment"
+    },
+    "health": {
+      "no_platforms": "[to be translated]:No messaging platforms connected yet"
+    },
+    "mode": {
+      "manual": "[to be translated]:Manual Process",
+      "service": "[to be translated]:Background Service",
+      "unknown": "[to be translated]:Unknown"
+    },
+    "not_detected": {
+      "description": "[to be translated]:Cherry Studio could not find a usable local Hermes checkout. Ensure /Users/jack/code/099-github/hermes-agent exists and that its virtual environment exposes the hermes CLI.",
+      "title": "[to be translated]:Hermes Repository Not Ready"
+    },
+    "sections": {
+      "gateway": "[to be translated]:Gateway Runtime",
+      "local_repo": "[to be translated]:Local Repository",
+      "platforms": "[to be translated]:Messaging Platforms",
+      "quick_actions": "[to be translated]:Quick Actions"
+    },
+    "title": "[to be translated]:Hermes"
+  },
   "history": {
     "continue_chat": "Chat fortsetzen",
     "error": {
@@ -5849,6 +5893,7 @@
     "apps": "Mini-Apps",
     "code": "Code",
     "files": "Datei",
+    "hermes": "[to be translated]:Hermes",
     "home": "Startseite",
     "knowledge": "Wissensdatenbank",
     "launchpad": "Launchpad",

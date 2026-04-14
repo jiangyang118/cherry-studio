@@ -54,6 +54,7 @@ import { ExportService } from './services/ExportService'
 import { externalAppsService } from './services/ExternalAppsService'
 import { fileStorage as fileManager } from './services/FileStorage'
 import FileService from './services/FileSystemService'
+import { hermesService } from './services/HermesService'
 import KnowledgeService from './services/KnowledgeService'
 import { lanTransferClientService } from './services/lanTransfer'
 import { localTransferService } from './services/LocalTransferService'
@@ -1169,6 +1170,15 @@ export async function registerIpc(mainWindow: BrowserWindow, app: Electron.App) 
   ipcMain.handle(IpcChannel.OpenClaw_GetChannels, openClawService.getChannelStatus)
   ipcMain.handle(IpcChannel.OpenClaw_CheckUpdate, openClawService.checkUpdate)
   ipcMain.handle(IpcChannel.OpenClaw_PerformUpdate, openClawService.performUpdate)
+
+  // Hermes
+  ipcMain.handle(IpcChannel.Hermes_CheckInstalled, hermesService.checkInstalled)
+  ipcMain.handle(IpcChannel.Hermes_StartGateway, hermesService.startGateway)
+  ipcMain.handle(IpcChannel.Hermes_StopGateway, hermesService.stopGateway)
+  ipcMain.handle(IpcChannel.Hermes_GetStatus, hermesService.getStatus)
+  ipcMain.handle(IpcChannel.Hermes_CheckHealth, hermesService.checkHealth)
+  ipcMain.handle(IpcChannel.Hermes_GetPlatforms, hermesService.getPlatforms)
+  ipcMain.handle(IpcChannel.Hermes_GetDocsUrl, hermesService.getDocsUrl)
 
   // WeChat
   ipcMain.handle(IpcChannel.WeChat_HasCredentials, async (_, channelId: string) => {

@@ -17,6 +17,7 @@ const ROUTE_LABELS: Record<string, { icon: string; label: string }> = {
   '/apps': { icon: '📦', label: 'Mini Apps' },
   '/code': { icon: '💻', label: 'Code Tools' },
   '/openclaw': { icon: '🦞', label: 'OpenClaw' },
+  '/hermes': { icon: '⚕️', label: 'Hermes' },
   '/launchpad': { icon: '🚀', label: 'Launchpad' },
   '/agents': { icon: '🤖', label: 'Agents' },
 

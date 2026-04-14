@@ -1903,6 +1903,50 @@
     },
     "title": "GPUStack"
   },
+  "hermes": {
+    "actions": {
+      "open_home": "Open Hermes Home",
+      "open_repo": "Open Repository",
+      "refresh": "Refresh",
+      "start": "Start Hermes Gateway",
+      "stop": "Stop Hermes Gateway",
+      "view_docs": "View Documentation"
+    },
+    "checking_installation": "Checking Hermes local integration...",
+    "description": "Connect the local hermes-agent repository in 099-github to Cherry Studio. This page detects the editable virtual environment, surfaces Hermes gateway runtime state, and lets you start or stop the local messaging gateway.",
+    "fields": {
+      "cli_path": "CLI Path",
+      "exit_reason": "Exit Reason",
+      "gateway_state": "Gateway State",
+      "hermes_home": "Hermes Home",
+      "issues": "Detection Issues",
+      "mode": "Run Mode",
+      "pid": "PID",
+      "platforms": "Platforms",
+      "repo_path": "Repository Path",
+      "updated_at": "Updated At",
+      "venv_path": "Virtual Environment"
+    },
+    "health": {
+      "no_platforms": "No messaging platforms connected yet"
+    },
+    "mode": {
+      "manual": "Manual Process",
+      "service": "Background Service",
+      "unknown": "Unknown"
+    },
+    "not_detected": {
+      "description": "Cherry Studio could not find a usable local Hermes checkout. Ensure /Users/jack/code/099-github/hermes-agent exists and that its virtual environment exposes the hermes CLI.",
+      "title": "Hermes Repository Not Ready"
+    },
+    "sections": {
+      "gateway": "Gateway Runtime",
+      "local_repo": "Local Repository",
+      "platforms": "Messaging Platforms",
+      "quick_actions": "Quick Actions"
+    },
+    "title": "Hermes"
+  },
   "history": {
     "continue_chat": "Continue Chatting",
     "error": {
@@ -5849,6 +5893,7 @@
     "apps": "Apps",
     "code": "Code",
     "files": "Files",
+    "hermes": "Hermes",
     "home": "Home",
     "knowledge": "Knowledge Base",
     "launchpad": "Launchpad",
