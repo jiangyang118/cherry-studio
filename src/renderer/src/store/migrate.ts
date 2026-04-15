@@ -3412,6 +3412,18 @@ const migrateConfig = {
       logger.error('migrate 206 error', error as Error)
       return state
     }
+  },
+  '207': (state: RootState) => {
+    try {
+      if (state.settings?.sidebarIcons && !state.settings.sidebarIcons.visible.includes('hermes')) {
+        state.settings.sidebarIcons.visible = [...state.settings.sidebarIcons.visible, 'hermes']
+      }
+      logger.info('migrate 207 success')
+      return state
+    } catch (error) {
+      logger.error('migrate 207 error', error as Error)
+      return state
+    }
   }
 }
 

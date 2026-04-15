@@ -446,6 +446,8 @@ export enum IpcChannel {
   OpenClaw_GetStatus = 'openclaw:get-status',
   OpenClaw_CheckHealth = 'openclaw:check-health',
   OpenClaw_GetDashboardUrl = 'openclaw:get-dashboard-url',
+  OpenClaw_GetConnectionConfig = 'openclaw:get-connection-config',
+  OpenClaw_SaveConnectionConfig = 'openclaw:save-connection-config',
   OpenClaw_SyncConfig = 'openclaw:sync-config',
   OpenClaw_GetChannels = 'openclaw:get-channels',
   OpenClaw_CheckUpdate = 'openclaw:check-update',
@@ -459,6 +461,8 @@ export enum IpcChannel {
   Hermes_CheckHealth = 'hermes:check-health',
   Hermes_GetPlatforms = 'hermes:get-platforms',
   Hermes_GetDocsUrl = 'hermes:get-docs-url',
+  Hermes_RunCommand = 'hermes:run-command',
+  Hermes_OpenInTerminal = 'hermes:open-in-terminal',
 
   // Analytics
   Analytics_TrackTokenUsage = 'analytics:track-token-usage'

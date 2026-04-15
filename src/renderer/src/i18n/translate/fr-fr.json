@@ -1908,12 +1908,20 @@
       "open_home": "[to be translated]:Open Hermes Home",
       "open_repo": "[to be translated]:Open Repository",
       "refresh": "[to be translated]:Refresh",
+      "run_in_terminal": "[to be translated]:Open in Terminal",
       "start": "[to be translated]:Start Hermes Gateway",
       "stop": "[to be translated]:Stop Hermes Gateway",
       "view_docs": "[to be translated]:View Documentation"
     },
     "checking_installation": "[to be translated]:Checking Hermes local integration...",
     "description": "[to be translated]:Connect the local hermes-agent repository in 099-github to Cherry Studio. This page detects the editable virtual environment, surfaces Hermes gateway runtime state, and lets you start or stop the local messaging gateway.",
+    "diagnostics": {
+      "doctor": "[to be translated]:Doctor",
+      "errors_log": "[to be translated]:Errors Log",
+      "gateway_log": "[to be translated]:Gateway Log",
+      "sessions": "[to be translated]:Recent Sessions",
+      "status_deep": "[to be translated]:Status Deep"
+    },
     "fields": {
       "cli_path": "[to be translated]:CLI Path",
       "exit_reason": "[to be translated]:Exit Reason",
@@ -1939,10 +1947,77 @@
       "description": "[to be translated]:Cherry Studio could not find a usable local Hermes checkout. Ensure /Users/jack/code/099-github/hermes-agent exists and that its virtual environment exposes the hermes CLI.",
       "title": "[to be translated]:Hermes Repository Not Ready"
     },
+    "output": {
+      "duration": "[to be translated]:Duration",
+      "empty": "[to be translated]:Run a diagnostic command to inspect Hermes output here.",
+      "exit_code": "[to be translated]:Exit Code",
+      "stderr": "[to be translated]:stderr",
+      "stdout": "[to be translated]:stdout"
+    },
+    "play_modes": {
+      "chat": {
+        "description": "[to be translated]:Start the real Hermes terminal UI and chat with the agent directly.",
+        "title": "[to be translated]:Chat UI"
+      },
+      "gateway_setup": {
+        "description": "[to be translated]:Run the messaging gateway setup wizard for Telegram, Slack, Discord, WhatsApp and more.",
+        "title": "[to be translated]:Gateway Setup"
+      },
+      "model": {
+        "description": "[to be translated]:Open the model picker to configure provider and default model interactively.",
+        "title": "[to be translated]:Model Picker"
+      },
+      "sessions": {
+        "description": "[to be translated]:Browse or resume historical Hermes sessions in an interactive picker.",
+        "title": "[to be translated]:Session Browser"
+      },
+      "setup": {
+        "description": "[to be translated]:Launch the first-run setup flow for API keys, configuration, and environment checks.",
+        "title": "[to be translated]:Setup Wizard"
+      },
+      "skills": {
+        "description": "[to be translated]:Explore the Hermes skills hub in a real terminal session.",
+        "title": "[to be translated]:Skills Hub"
+      }
+    },
+    "playbooks": {
+      "gateway_onboarding": {
+        "step1": "[to be translated]:Click \"Gateway Setup\" to configure Telegram, Slack, Discord, WhatsApp or other messaging platforms in a real terminal.",
+        "step2": "[to be translated]:When you finish the wizard, return here and use Start Hermes Gateway to bring the local gateway online.",
+        "step3": "[to be translated]:If something fails, run Doctor or Gateway Log below to see what Hermes is missing.",
+        "summary": "[to be translated]:Turn Hermes into a messaging agent you can talk to from external platforms.",
+        "title": "[to be translated]:Connect Messaging Platforms"
+      },
+      "model_setup": {
+        "step1": "[to be translated]:Open \"Model Picker\" to select the provider and default model Hermes should use.",
+        "step2": "[to be translated]:If you have not configured keys yet, run \"Setup Wizard\" first so Hermes can write config.yaml and .env.",
+        "step3": "[to be translated]:Use Status Deep or Doctor below to verify provider auth and model setup after you finish.",
+        "summary": "[to be translated]:Configure the model stack before serious usage.",
+        "title": "[to be translated]:Set Up Models"
+      },
+      "quick_start": {
+        "step1": "[to be translated]:Click \"Chat UI\" to launch the real Hermes terminal interface.",
+        "step2": "[to be translated]:Try one direct prompt, then use \"Status Deep\" below to see how Hermes is currently configured.",
+        "step3": "[to be translated]:If the terminal session reports missing keys or tools, follow the Setup Wizard card next.",
+        "summary": "[to be translated]:The fastest way to start playing with Hermes.",
+        "title": "[to be translated]:Quick Start"
+      },
+      "skills_and_sessions": {
+        "step1": "[to be translated]:Open \"Skills Hub\" to browse installed or available skills in the Hermes ecosystem.",
+        "step2": "[to be translated]:Open \"Session Browser\" when you want to revisit prior conversations or cron-generated sessions.",
+        "step3": "[to be translated]:Use Recent Sessions or Errors Log below to inspect activity without leaving Cherry Studio.",
+        "summary": "[to be translated]:Explore procedural memory, skills, and session history.",
+        "title": "[to be translated]:Skills and Sessions"
+      }
+    },
     "sections": {
+      "diagnostics": "[to be translated]:Diagnostics",
       "gateway": "[to be translated]:Gateway Runtime",
       "local_repo": "[to be translated]:Local Repository",
+      "output": "[to be translated]:Command Output",
       "platforms": "[to be translated]:Messaging Platforms",
+      "play_modes": "[to be translated]:Play Modes",
+      "playbooks": "[to be translated]:How to Play",
       "quick_actions": "[to be translated]:Quick Actions"
     },
     "title": "[to be translated]:Hermes"
@@ -2969,8 +3044,25 @@
   },
   "openclaw": {
     "checking_installation": "Vérification de l'installation d'OpenClaw...",
+    "connection": {
+      "control_ui_base_path": "[to be translated]:Control UI Path",
+      "control_ui_base_path_placeholder": "[to be translated]:/openclaw",
+      "local": "[to be translated]:Local",
+      "local_hint": "[to be translated]:Use the local OpenClaw binary and sync Cherry Studio providers into your local config.",
+      "remote": "[to be translated]:Remote",
+      "remote_auth_hint": "[to be translated]:Remote mode connects to an existing gateway. Token is recommended for dashboard auto-auth and protected API calls.",
+      "remote_hint": "[to be translated]:Connect Cherry Studio to an existing remote OpenClaw gateway without rewriting your local agents or workspaces.",
+      "remote_password": "[to be translated]:Remote Password",
+      "remote_password_placeholder": "[to be translated]:Optional password for remote gateway auth",
+      "remote_token": "[to be translated]:Remote Gateway Token",
+      "remote_token_placeholder": "[to be translated]:Optional token for remote gateway auth",
+      "remote_url": "[to be translated]:Remote Gateway URL",
+      "remote_url_placeholder": "[to be translated]:wss://gateway.example.com:17310",
+      "title": "[to be translated]:Connection Mode"
+    },
     "description": "Intégrer les fournisseurs Cherry Studio avec la passerelle OpenClaw pour permettre aux agents de codage IA comme Claude Code, Qwen-Coder, et bien d'autres.",
     "error": {
+      "remote_url_required": "[to be translated]:Please enter the remote gateway URL first.",
       "select_provider_model": "Veuillez d'abord sélectionner un fournisseur et un modèle"
     },
     "gateway": {
@@ -3036,6 +3128,7 @@
       "view_docs": "Voir la documentation"
     },
     "status": {
+      "connected": "[to be translated]:Connected",
       "error": "Erreur",
       "running": "Courir",
       "starting": "Commencement",

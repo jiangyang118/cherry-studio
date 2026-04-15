@@ -9,10 +9,14 @@ type CliOptions = {
   apiBase: string
   apiKey?: string
   cdpPort: number
+  createIfMissing?: boolean
   directory: string
+  forceReload?: boolean
   knowledgeBaseId?: string
   knowledgeBaseName?: string
   pollIntervalMs: number
+  templateKnowledgeBaseId?: string
+  templateKnowledgeBaseName?: string
   timeoutMs: number
 }
 
@@ -71,6 +75,9 @@ function printHelp(): void {
   pnpm tsx scripts/import-knowledge-directory.ts \\
     --directory '/absolute/path' \\
     --knowledge-base '测试知识库' \\
+    [--create-if-missing] \\
+    [--template-knowledge-base '测试知识库'] \\
+    [--force-reload] \\
     [--api-base ${DEFAULT_API_BASE}] \\
     [--api-key <key>] \\
     [--cdp-port ${DEFAULT_CDP_PORT}] \\
@@ -117,12 +124,26 @@ export function parseCliArgs(argv: string[]): CliOptions {
         options.directory = next
         i++
         break
+      case '--create-if-missing':
+        options.createIfMissing = true
+        break
+      case '--force-reload':
+        options.forceReload = true
+        break
       case '--knowledge-base':
         options.knowledgeBaseName = next
         i++
         break
       case '--knowledge-base-id':
         options.knowledgeBaseId = next
+        i++
+        break
+      case '--template-knowledge-base':
+        options.templateKnowledgeBaseName = next
+        i++
+        break
+      case '--template-knowledge-base-id':
+        options.templateKnowledgeBaseId = next
         i++
         break
       case '--poll-interval-ms':
@@ -234,7 +255,14 @@ async function listKnowledgeBases(apiBase: string, apiKey: string): Promise<Know
 }
 
 async function getCdpPage(cdpPort: number): Promise<CdpPage> {
-  const pages = await requestJson<CdpPage[]>(`http://127.0.0.1:${cdpPort}/json/list`)
+  let pages: CdpPage[]
+  try {
+    pages = await requestJson<CdpPage[]>(`http://127.0.0.1:${cdpPort}/json/list`)
+  } catch (error) {
+    throw new Error(
+      `Cannot reach Cherry Studio CDP on port ${cdpPort}. Start the app with --remote-debugging-port=${cdpPort}.`
+    )
+  }
   const page = pages.find((item) => item.type === 'page' && item.title === 'Cherry Studio')
   if (!page) {
     throw new Error(
@@ -286,15 +314,23 @@ async function createCdpClient(cdpPort: number): Promise<CdpClient> {
 }
 
 function buildImportExpression(params: {
+  createIfMissing?: boolean
   directory: string
+  forceReload?: boolean
   knowledgeBaseId?: string
   knowledgeBaseName?: string
+  templateKnowledgeBaseId?: string
+  templateKnowledgeBaseName?: string
 }): string {
   return `
     (async () => {
+      const createIfMissing = ${JSON.stringify(params.createIfMissing === true)};
       const directoryPath = ${JSON.stringify(params.directory)};
+      const forceReload = ${JSON.stringify(params.forceReload === true)};
       const knowledgeBaseId = ${JSON.stringify(params.knowledgeBaseId || null)};
       const knowledgeBaseName = ${JSON.stringify(params.knowledgeBaseName || null)};
+      const templateKnowledgeBaseId = ${JSON.stringify(params.templateKnowledgeBaseId || null)};
+      const templateKnowledgeBaseName = ${JSON.stringify(params.templateKnowledgeBaseName || null)};
 
       const trimTrailingSlash = (value) => (value || '').replace(/\\/+$/, '');
       const withoutTrailingSharp = (value) => value.endsWith('#') ? value.slice(0, -1) : value;
@@ -330,10 +366,82 @@ function buildImportExpression(params: {
           .filter(Boolean)[0] || 'secret';
       };
 
+      const buildBaseParams = (base, state) => {
+        const provider = state.llm.providers.find((item) => item.id === base.model.provider);
+        if (!provider) {
+          throw new Error('provider not found: ' + base.model.provider);
+        }
+
+        const { baseURL: embedBaseURL } = routeToEndpoint(provider.apiHost || '');
+        const baseParams = {
+          id: base.id,
+          dimensions: base.dimensions,
+          chunkSize: base.chunkSize,
+          chunkOverlap: base.chunkOverlap,
+          documentCount: base.documentCount,
+          preprocessProvider: base.preprocessProvider,
+          embedApiClient: {
+            model: base.model.id,
+            provider: base.model.provider,
+            apiKey: getApiKey(provider),
+            baseURL:
+              provider.id === 'gemini'
+                ? embedBaseURL + '/openai'
+                : provider.id === 'azure-openai'
+                  ? embedBaseURL + '/v1'
+                  : provider.id === 'ollama'
+                    ? embedBaseURL.replace(/\\/api$/, '')
+                    : embedBaseURL
+          }
+        };
+
+        if (base.rerankModel) {
+          const rerankProvider = state.llm.providers.find((item) => item.id === base.rerankModel.provider);
+          if (rerankProvider) {
+            const { baseURL: rerankBaseURL } = routeToEndpoint(rerankProvider.apiHost || '');
+            baseParams.rerankApiClient = {
+              model: base.rerankModel.id,
+              provider: base.rerankModel.provider,
+              apiKey: getApiKey(rerankProvider),
+              baseURL: rerankBaseURL
+            };
+          }
+        }
+
+        return baseParams;
+      };
+
       const state = window.store.getState();
-      const base = state.knowledge.bases.find((item) =>
+      let base = state.knowledge.bases.find((item) =>
         knowledgeBaseId ? item.id === knowledgeBaseId : item.name === knowledgeBaseName
       );
+
+      if (!base && createIfMissing) {
+        const templateBase = state.knowledge.bases.find((item) =>
+          templateKnowledgeBaseId
+            ? item.id === templateKnowledgeBaseId
+            : templateKnowledgeBaseName
+              ? item.name === templateKnowledgeBaseName
+              : true
+        );
+
+        if (!templateBase) {
+          return { ok: false, error: 'template knowledge base not found' };
+        }
+
+        const now = Date.now();
+        base = {
+          ...templateBase,
+          id: crypto.randomUUID(),
+          name: knowledgeBaseName || templateBase.name,
+          items: [],
+          created_at: now,
+          updated_at: now
+        };
+
+        await window.api.knowledgeBase.create(buildBaseParams(base, state));
+        window.store.dispatch({ type: 'knowledge/addBase', payload: base });
+      }
 
       if (!base) {
         return { ok: false, error: 'knowledge base not found' };
@@ -341,6 +449,32 @@ function buildImportExpression(params: {
 
       const existing = base.items.find((item) => item.type === 'directory' && item.content === directoryPath);
       if (existing) {
+        if (!forceReload) {
+          return {
+            ok: true,
+            skipped: true,
+            reason: 'directory already exists',
+            baseId: base.id,
+            itemId: existing.id,
+            result: {
+              uniqueId: existing.uniqueId,
+              uniqueIds: existing.uniqueIds || []
+            }
+          };
+        }
+
+        if (existing.uniqueId || (existing.uniqueIds && existing.uniqueIds.length > 0)) {
+          await window.api.knowledgeBase.remove({
+            uniqueId: existing.uniqueId || '',
+            uniqueIds: existing.uniqueIds || (existing.uniqueId ? [existing.uniqueId] : []),
+            base: buildBaseParams(base, state)
+          });
+        }
+
+        window.store.dispatch({ type: 'knowledge/removeItem', payload: { baseId: base.id, item: existing } });
+      }
+
+      if (existing && !forceReload) {
         return {
           ok: true,
           skipped: true,
@@ -353,13 +487,6 @@ function buildImportExpression(params: {
           }
         };
       }
-
-      const provider = state.llm.providers.find((item) => item.id === base.model.provider);
-      if (!provider) {
-        return { ok: false, error: 'provider not found: ' + base.model.provider };
-      }
-
-      const { baseURL: embedBaseURL } = routeToEndpoint(provider.apiHost || '');
 
       const now = Date.now();
       const item = {
@@ -376,43 +503,8 @@ function buildImportExpression(params: {
 
       window.store.dispatch({ type: 'knowledge/addItem', payload: { baseId: base.id, item } });
 
-      const baseParams = {
-        id: base.id,
-        dimensions: base.dimensions,
-        chunkSize: base.chunkSize,
-        chunkOverlap: base.chunkOverlap,
-        documentCount: base.documentCount,
-        preprocessProvider: base.preprocessProvider,
-        embedApiClient: {
-          model: base.model.id,
-          provider: base.model.provider,
-          apiKey: getApiKey(provider),
-          baseURL:
-            provider.id === 'gemini'
-              ? embedBaseURL + '/openai'
-              : provider.id === 'azure-openai'
-                ? embedBaseURL + '/v1'
-                : provider.id === 'ollama'
-                  ? embedBaseURL.replace(/\\/api$/, '')
-                  : embedBaseURL
-        }
-      };
-
-      if (base.rerankModel) {
-        const rerankProvider = state.llm.providers.find((item) => item.id === base.rerankModel.provider);
-        if (rerankProvider) {
-          const { baseURL: rerankBaseURL } = routeToEndpoint(rerankProvider.apiHost || '');
-          baseParams.rerankApiClient = {
-            model: base.rerankModel.id,
-            provider: base.rerankModel.provider,
-            apiKey: getApiKey(rerankProvider),
-            baseURL: rerankBaseURL
-          };
-        }
-      }
-
       const result = await window.api.knowledgeBase.add({
-        base: baseParams,
+        base: buildBaseParams(base, state),
         item,
         userId: ''
       });
@@ -459,9 +551,13 @@ async function importDirectoryViaRenderer(options: CliOptions): Promise<CdpRespo
     }
   }>('Runtime.evaluate', {
     expression: buildImportExpression({
+      createIfMissing: options.createIfMissing,
       directory: options.directory,
+      forceReload: options.forceReload,
       knowledgeBaseId: options.knowledgeBaseId,
-      knowledgeBaseName: options.knowledgeBaseName
+      knowledgeBaseName: options.knowledgeBaseName,
+      templateKnowledgeBaseId: options.templateKnowledgeBaseId,
+      templateKnowledgeBaseName: options.templateKnowledgeBaseName
     }),
     awaitPromise: true,
     returnByValue: true,
@@ -530,7 +626,7 @@ async function main(): Promise<void> {
     options.knowledgeBaseId ? item.id === options.knowledgeBaseId : item.name === options.knowledgeBaseName
   )
 
-  if (!base) {
+  if (!base && !options.createIfMissing) {
     throw new Error(
       options.knowledgeBaseId
         ? `Knowledge base ID not found: ${options.knowledgeBaseId}`
@@ -543,10 +639,22 @@ async function main(): Promise<void> {
     throw new Error(result.error || result.result?.message || 'Renderer import failed')
   }
 
+  const basesAfter = await listKnowledgeBases(apiBase, apiKey)
+  const resolvedBase = basesAfter.find((item) =>
+    options.knowledgeBaseId ? item.id === options.knowledgeBaseId : item.name === options.knowledgeBaseName
+  )
+  if (!resolvedBase) {
+    throw new Error(
+      options.knowledgeBaseId
+        ? `Knowledge base ID not found after import: ${options.knowledgeBaseId}`
+        : `Knowledge base name not found after import: ${options.knowledgeBaseName}`
+    )
+  }
+
   const item = await waitForImportCompletion(
     apiBase,
     apiKey,
-    base.id,
+    resolvedBase.id,
     options.directory,
     options.timeoutMs,
     options.pollIntervalMs
@@ -558,8 +666,8 @@ async function main(): Promise<void> {
         ok: true,
         skipped: result.skipped === true,
         knowledgeBase: {
-          id: base.id,
-          name: base.name
+          id: resolvedBase.id,
+          name: resolvedBase.name
         },
         directory: options.directory,
         itemId: item.id,

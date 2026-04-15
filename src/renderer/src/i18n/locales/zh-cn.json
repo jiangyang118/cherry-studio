@@ -1908,12 +1908,84 @@
       "open_home": "打开 Hermes 主目录",
       "open_repo": "打开仓库",
       "refresh": "刷新",
+      "run_in_terminal": "在 iTerm 中打开",
       "start": "启动 Hermes Gateway",
       "stop": "停止 Hermes Gateway",
       "view_docs": "查看文档"
     },
+    "bundle": {
+      "actions": {
+        "createCronHooksTask": "创建 Cron + Hooks 模板",
+        "createDailyTask": "创建 Daily Briefing 模板",
+        "createPlanner": "创建规划助手预设",
+        "goToKnowledge": "前往知识库",
+        "goToPlanner": "前往预设页",
+        "goToTasks": "前往任务页",
+        "importKnowledge": "导入知识包",
+        "openBundle": "打开总包",
+        "openFolder": "打开目录",
+        "outputMethods": "输出玩法方法"
+      },
+      "cards": {
+        "knowledge": {
+          "summary": "把已同步的 Hermes playbooks 总包作为 Cherry 的正式知识包，而不是把整份文档硬塞进 prompt。",
+          "title": "知识包"
+        },
+        "planner": {
+          "hint": "这个预设会绑定已导入的知识库，把 prompt 保持得尽量轻，让总包内容可以独立迭代。",
+          "summary": "创建一个可复用的助手预设，专门把 Hermes 玩法翻译成 Cherry Studio 的功能规划。",
+          "title": "规划助手预设"
+        },
+        "templates": {
+          "hint": "模板会先作为暂停状态的任务创建到默认自治 agent 上，方便你先 review 再手动启用。",
+          "summary": "先落地两套和玩法最贴近的任务模板。",
+          "title": "任务模板"
+        }
+      },
+      "errors": {
+        "apiServerRequired": "创建任务模板前需要先启动 API Server。",
+        "bundleMissing": "Cherry Studio 数据目录里还没有找到 Hermes playbooks 总包。",
+        "embeddingModelMissing": "当前没有可用的 embedding 模型，先配置一个再导入知识包。",
+        "importFailed": "导入 Hermes 知识包失败。",
+        "presetFailed": "创建 Hermes 规划助手预设失败。",
+        "taskAgentMissing": "当前没有可用于任务模板的自治 agent。"
+      },
+      "messages": {
+        "knowledgeReady": "Hermes 知识包已经就绪。",
+        "presetCreated": "Hermes 规划助手预设已创建。",
+        "presetExists": "Hermes 规划助手预设已经存在。",
+        "taskAgent": "任务归属 agent：{{name}}",
+        "taskExists": "{{name}} 已经存在。"
+      },
+      "planner": {
+        "name": "Hermes 玩法规划师"
+      },
+      "sectionTitle": "知识包动作入口",
+      "status": {
+        "checking": "检查中",
+        "created": "已创建",
+        "createdPaused": "已创建（暂停）",
+        "failed": "导入失败",
+        "importing": "导入中",
+        "missing": "总包缺失",
+        "notCreated": "未创建",
+        "notImported": "未导入",
+        "ready": "已就绪"
+      },
+      "templates": {
+        "cronHooks": "Cron + Hooks 巡检",
+        "dailyBriefing": "Daily Briefing 复盘"
+      }
+    },
     "checking_installation": "正在检查 Hermes 本地接入状态...",
     "description": "把 099-github 里的本地 hermes-agent 仓库接入 Cherry Studio。此页面会检测可编辑虚拟环境、展示 Hermes gateway 运行状态，并允许你直接启动或停止本地消息网关。",
+    "diagnostics": {
+      "doctor": "Doctor 检查",
+      "errors_log": "错误日志",
+      "gateway_log": "网关日志",
+      "sessions": "最近会话",
+      "status_deep": "深度状态"
+    },
     "fields": {
       "cli_path": "CLI 路径",
       "exit_reason": "退出原因",
@@ -1939,10 +2011,77 @@
       "description": "Cherry Studio 没有找到可用的本地 Hermes 仓库。请确认 /Users/jack/code/099-github/hermes-agent 存在，并且虚拟环境中已经安装了 hermes CLI。",
       "title": "Hermes 仓库尚未就绪"
     },
+    "output": {
+      "duration": "耗时",
+      "empty": "运行一条诊断命令后，这里会显示 Hermes 的输出。",
+      "exit_code": "退出码",
+      "stderr": "错误输出",
+      "stdout": "标准输出"
+    },
+    "play_modes": {
+      "chat": {
+        "description": "启动真正的 Hermes 终端界面，直接和 agent 对话。",
+        "title": "聊天界面"
+      },
+      "gateway_setup": {
+        "description": "运行消息网关配置向导，接 Telegram、Slack、Discord、WhatsApp 等平台。",
+        "title": "网关配置"
+      },
+      "model": {
+        "description": "打开模型选择器，交互式配置 provider 和默认模型。",
+        "title": "模型选择"
+      },
+      "sessions": {
+        "description": "在交互式选择器里浏览或恢复历史 Hermes 会话。",
+        "title": "会话浏览"
+      },
+      "setup": {
+        "description": "启动首次配置流程，处理 API Key、配置和环境检查。",
+        "title": "初始化向导"
+      },
+      "skills": {
+        "description": "在真实终端中探索 Hermes Skills Hub。",
+        "title": "技能中心"
+      }
+    },
+    "playbooks": {
+      "gateway_onboarding": {
+        "step1": "点击“网关配置”，在真实终端里配置 Telegram、Slack、Discord、WhatsApp 等消息平台。",
+        "step2": "配置完成后回到这里，点击“启动 Hermes Gateway”，把本地消息网关真正跑起来。",
+        "step3": "如果启动失败，就运行下面的 Doctor 或网关日志，看看 Hermes 缺了什么依赖或配置。",
+        "summary": "把 Hermes 变成能在外部消息平台上对话的 agent。",
+        "title": "接入消息平台"
+      },
+      "model_setup": {
+        "step1": "点击“模型选择”，交互式选择 Hermes 要使用的 provider 和默认模型。",
+        "step2": "如果你还没配过 key，先跑“初始化向导”，让 Hermes 写入 config.yaml 和 .env。",
+        "step3": "配置完成后，运行下面的“深度状态”或“Doctor 检查”，确认模型和鉴权已经生效。",
+        "summary": "正式使用前，先把模型栈配置好。",
+        "title": "配置模型"
+      },
+      "quick_start": {
+        "step1": "点击“聊天界面”，直接打开真正的 Hermes 终端 UI。",
+        "step2": "先试一条简单 prompt，然后运行下面的“深度状态”，看看 Hermes 当前配置到了什么程度。",
+        "step3": "如果终端提示缺少 key 或工具，再按下一张“初始化向导”卡片继续补配置。",
+        "summary": "最快开始玩 Hermes 的方式。",
+        "title": "快速上手"
+      },
+      "skills_and_sessions": {
+        "step1": "点击“技能中心”，浏览 Hermes 生态里的技能能力。",
+        "step2": "点击“会话浏览”，查看或恢复以前跑过的 Hermes 会话和 cron 任务会话。",
+        "step3": "如果只想快速看活动情况，可以直接在下面运行“最近会话”或“错误日志”。",
+        "summary": "体验 Hermes 的技能体系、记忆和会话历史。",
+        "title": "技能与会话"
+      }
+    },
     "sections": {
+      "diagnostics": "诊断入口",
       "gateway": "网关运行状态",
       "local_repo": "本地仓库",
+      "output": "命令输出",
       "platforms": "消息平台",
+      "play_modes": "玩法入口",
+      "playbooks": "玩法说明",
       "quick_actions": "快捷操作"
     },
     "title": "Hermes"
@@ -2969,8 +3108,25 @@
   },
   "openclaw": {
     "checking_installation": "正在检查 OpenClaw 安装状态...",
+    "connection": {
+      "control_ui_base_path": "控制面板路径",
+      "control_ui_base_path_placeholder": "/openclaw",
+      "local": "本地",
+      "local_hint": "使用本地 OpenClaw binary，并把 Cherry Studio 服务商同步到本机配置。",
+      "remote": "远端",
+      "remote_auth_hint": "远端模式只连接已有网关，不会重写你本地的 agents 或 workspaces。建议填写 token 以便自动登录控制面板和访问受保护接口。",
+      "remote_hint": "将 Cherry Studio 连接到已有的远端 OpenClaw 网关，而不是启动本地 gateway。",
+      "remote_password": "远端密码",
+      "remote_password_placeholder": "可选：远端 gateway 密码",
+      "remote_token": "远端 Gateway Token",
+      "remote_token_placeholder": "可选：远端 gateway token",
+      "remote_url": "远端 Gateway URL",
+      "remote_url_placeholder": "wss://gateway.example.com:17310",
+      "title": "连接模式"
+    },
     "description": "使用 Cherry Studio 服务商为 OpenClaw 提供支持，OpenClaw 是您的个人 AI 助手，可在 WhatsApp、Telegram、Slack、Discord 等平台上使用。",
     "error": {
+      "remote_url_required": "请先填写远端 gateway URL",
       "select_provider_model": "请先选择服务商和模型"
     },
     "gateway": {
@@ -3036,6 +3192,7 @@
       "view_docs": "查看文档"
     },
     "status": {
+      "connected": "已连接",
       "error": "错误",
       "running": "运行中",
       "starting": "启动中",

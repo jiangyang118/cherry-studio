@@ -1908,12 +1908,84 @@
       "open_home": "[to be translated]:Open Hermes Home",
       "open_repo": "[to be translated]:Open Repository",
       "refresh": "[to be translated]:Refresh",
+      "run_in_terminal": "[to be translated]:Open in iTerm",
       "start": "[to be translated]:Start Hermes Gateway",
       "stop": "[to be translated]:Stop Hermes Gateway",
       "view_docs": "[to be translated]:View Documentation"
     },
+    "bundle": {
+      "actions": {
+        "createCronHooksTask": "[to be translated]:Create Cron + Hooks Template",
+        "createDailyTask": "[to be translated]:Create Daily Briefing Template",
+        "createPlanner": "[to be translated]:Create Planner Preset",
+        "goToKnowledge": "[to be translated]:Go to Knowledge",
+        "goToPlanner": "[to be translated]:Go to Presets",
+        "goToTasks": "[to be translated]:Go to Tasks",
+        "importKnowledge": "[to be translated]:Import Knowledge Pack",
+        "openBundle": "[to be translated]:Open Bundle",
+        "openFolder": "[to be translated]:Open Folder",
+        "outputMethods": "[to be translated]:Output Playbook Methods"
+      },
+      "cards": {
+        "knowledge": {
+          "summary": "[to be translated]:Treat the synced Hermes playbooks bundle as a first-class Cherry knowledge pack instead of pasting the whole file into prompts.",
+          "title": "[to be translated]:Knowledge Pack"
+        },
+        "planner": {
+          "hint": "[to be translated]:This preset binds the imported knowledge base and keeps prompt text small so the bundle can evolve independently.",
+          "summary": "[to be translated]:Create a reusable assistant preset that plans Cherry Studio features from Hermes playbook patterns.",
+          "title": "[to be translated]:Planner Preset"
+        },
+        "templates": {
+          "hint": "[to be translated]:Templates are created as paused tasks on the default autonomous agent so you can review and activate them manually.",
+          "summary": "[to be translated]:Create paused task templates for the first two playbook-driven workflows.",
+          "title": "[to be translated]:Task Templates"
+        }
+      },
+      "errors": {
+        "apiServerRequired": "[to be translated]:API server must be running before task templates can be created.",
+        "bundleMissing": "[to be translated]:Hermes playbooks bundle is missing from Cherry Studio's data directory.",
+        "embeddingModelMissing": "[to be translated]:No embedding model is available. Configure one before importing the knowledge pack.",
+        "importFailed": "[to be translated]:Failed to import the Hermes knowledge pack.",
+        "presetFailed": "[to be translated]:Failed to create the Hermes planner preset.",
+        "taskAgentMissing": "[to be translated]:No autonomous agent is available for task templates."
+      },
+      "messages": {
+        "knowledgeReady": "[to be translated]:Hermes knowledge pack is ready.",
+        "presetCreated": "[to be translated]:Hermes planner preset created.",
+        "presetExists": "[to be translated]:Hermes planner preset already exists.",
+        "taskAgent": "[to be translated]:Task agent: {{name}}",
+        "taskExists": "[to be translated]:{{name}} already exists."
+      },
+      "planner": {
+        "name": "[to be translated]:Hermes Playbook Planner"
+      },
+      "sectionTitle": "[to be translated]:Knowledge Pack Actions",
+      "status": {
+        "checking": "[to be translated]:Checking",
+        "created": "[to be translated]:Created",
+        "createdPaused": "[to be translated]:Created (Paused)",
+        "failed": "[to be translated]:Import Failed",
+        "importing": "[to be translated]:Importing",
+        "missing": "[to be translated]:Bundle Missing",
+        "notCreated": "[to be translated]:Not Created",
+        "notImported": "[to be translated]:Not Imported",
+        "ready": "[to be translated]:Ready"
+      },
+      "templates": {
+        "cronHooks": "[to be translated]:Cron + Hooks Audit",
+        "dailyBriefing": "[to be translated]:Daily Briefing Review"
+      }
+    },
     "checking_installation": "[to be translated]:Checking Hermes local integration...",
     "description": "[to be translated]:Connect the local hermes-agent repository in 099-github to Cherry Studio. This page detects the editable virtual environment, surfaces Hermes gateway runtime state, and lets you start or stop the local messaging gateway.",
+    "diagnostics": {
+      "doctor": "[to be translated]:Doctor",
+      "errors_log": "[to be translated]:Errors Log",
+      "gateway_log": "[to be translated]:Gateway Log",
+      "sessions": "[to be translated]:Recent Sessions",
+      "status_deep": "[to be translated]:Status Deep"
+    },
     "fields": {
       "cli_path": "[to be translated]:CLI Path",
       "exit_reason": "[to be translated]:Exit Reason",
@@ -1939,10 +2011,77 @@
       "description": "[to be translated]:Cherry Studio could not find a usable local Hermes checkout. Ensure /Users/jack/code/099-github/hermes-agent exists and that its virtual environment exposes the hermes CLI.",
       "title": "[to be translated]:Hermes Repository Not Ready"
     },
+    "output": {
+      "duration": "[to be translated]:Duration",
+      "empty": "[to be translated]:Run a diagnostic command to inspect Hermes output here.",
+      "exit_code": "[to be translated]:Exit Code",
+      "stderr": "[to be translated]:stderr",
+      "stdout": "[to be translated]:stdout"
+    },
+    "play_modes": {
+      "chat": {
+        "description": "[to be translated]:Start the real Hermes terminal UI and chat with the agent directly.",
+        "title": "[to be translated]:Chat UI"
+      },
+      "gateway_setup": {
+        "description": "[to be translated]:Run the messaging gateway setup wizard for Telegram, Slack, Discord, WhatsApp and more.",
+        "title": "[to be translated]:Gateway Setup"
+      },
+      "model": {
+        "description": "[to be translated]:Open the model picker to configure provider and default model interactively.",
+        "title": "[to be translated]:Model Picker"
+      },
+      "sessions": {
+        "description": "[to be translated]:Browse or resume historical Hermes sessions in an interactive picker.",
+        "title": "[to be translated]:Session Browser"
+      },
+      "setup": {
+        "description": "[to be translated]:Launch the first-run setup flow for API keys, configuration, and environment checks.",
+        "title": "[to be translated]:Setup Wizard"
+      },
+      "skills": {
+        "description": "[to be translated]:Explore the Hermes skills hub in a real terminal session.",
+        "title": "[to be translated]:Skills Hub"
+      }
+    },
+    "playbooks": {
+      "gateway_onboarding": {
+        "step1": "[to be translated]:Click \"Gateway Setup\" to configure Telegram, Slack, Discord, WhatsApp or other messaging platforms in a real terminal.",
+        "step2": "[to be translated]:When you finish the wizard, return here and use Start Hermes Gateway to bring the local gateway online.",
+        "step3": "[to be translated]:If something fails, run Doctor or Gateway Log below to see what Hermes is missing.",
+        "summary": "[to be translated]:Turn Hermes into a messaging agent you can talk to from external platforms.",
+        "title": "[to be translated]:Connect Messaging Platforms"
+      },
+      "model_setup": {
+        "step1": "[to be translated]:Open \"Model Picker\" to select the provider and default model Hermes should use.",
+        "step2": "[to be translated]:If you have not configured keys yet, run \"Setup Wizard\" first so Hermes can write config.yaml and .env.",
+        "step3": "[to be translated]:Use Status Deep or Doctor below to verify provider auth and model setup after you finish.",
+        "summary": "[to be translated]:Configure the model stack before serious usage.",
+        "title": "[to be translated]:Set Up Models"
+      },
+      "quick_start": {
+        "step1": "[to be translated]:Click \"Chat UI\" to launch the real Hermes terminal interface.",
+        "step2": "[to be translated]:Try one direct prompt, then use \"Status Deep\" below to see how Hermes is currently configured.",
+        "step3": "[to be translated]:If the terminal session reports missing keys or tools, follow the Setup Wizard card next.",
+        "summary": "[to be translated]:The fastest way to start playing with Hermes.",
+        "title": "[to be translated]:Quick Start"
+      },
+      "skills_and_sessions": {
+        "step1": "[to be translated]:Open \"Skills Hub\" to browse installed or available skills in the Hermes ecosystem.",
+        "step2": "[to be translated]:Open \"Session Browser\" when you want to revisit prior conversations or cron-generated sessions.",
+        "step3": "[to be translated]:Use Recent Sessions or Errors Log below to inspect activity without leaving Cherry Studio.",
+        "summary": "[to be translated]:Explore procedural memory, skills, and session history.",
+        "title": "[to be translated]:Skills and Sessions"
+      }
+    },
     "sections": {
+      "diagnostics": "[to be translated]:Diagnostics",
       "gateway": "[to be translated]:Gateway Runtime",
       "local_repo": "[to be translated]:Local Repository",
+      "output": "[to be translated]:Command Output",
       "platforms": "[to be translated]:Messaging Platforms",
+      "play_modes": "[to be translated]:Play Modes",
+      "playbooks": "[to be translated]:How to Play",
       "quick_actions": "[to be translated]:Quick Actions"
     },
     "title": "[to be translated]:Hermes"
@@ -2969,8 +3108,25 @@
   },
   "openclaw": {
     "checking_installation": "正在檢查 OpenClaw 安裝狀態...",
+    "connection": {
+      "control_ui_base_path": "控制面板路徑",
+      "control_ui_base_path_placeholder": "/openclaw",
+      "local": "本機",
+      "local_hint": "使用本機 OpenClaw binary，並把 Cherry Studio 服務商同步到本機設定。",
+      "remote": "遠端",
+      "remote_auth_hint": "遠端模式只連線到既有 gateway，不會重寫你本機的 agents 或 workspaces。建議填入 token 以便自動登入控制面板與存取受保護介面。",
+      "remote_hint": "將 Cherry Studio 連線到既有的遠端 OpenClaw gateway，而不是啟動本機 gateway。",
+      "remote_password": "遠端密碼",
+      "remote_password_placeholder": "可選：遠端 gateway 密碼",
+      "remote_token": "遠端 Gateway Token",
+      "remote_token_placeholder": "可選：遠端 gateway token",
+      "remote_url": "遠端 Gateway URL",
+      "remote_url_placeholder": "wss://gateway.example.com:17310",
+      "title": "連線模式"
+    },
     "description": "使用 Cherry Studio 服務商為 OpenClaw 提供支援，OpenClaw 是您的個人 AI 助手，可在 WhatsApp、Telegram、Slack、Discord 等平台上使用。",
     "error": {
+      "remote_url_required": "請先填寫遠端 gateway URL",
       "select_provider_model": "請先選擇服務商和模型"
     },
     "gateway": {
@@ -3036,6 +3192,7 @@
       "view_docs": "檢視文件"
     },
     "status": {
+      "connected": "已連線",
       "error": "錯誤",
       "running": "執行中",
       "starting": "啟動中",

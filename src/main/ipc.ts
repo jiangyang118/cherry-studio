@@ -1166,6 +1166,8 @@ export async function registerIpc(mainWindow: BrowserWindow, app: Electron.App) 
   ipcMain.handle(IpcChannel.OpenClaw_GetStatus, openClawService.getStatus)
   ipcMain.handle(IpcChannel.OpenClaw_CheckHealth, openClawService.checkHealth)
   ipcMain.handle(IpcChannel.OpenClaw_GetDashboardUrl, openClawService.getDashboardUrl)
+  ipcMain.handle(IpcChannel.OpenClaw_GetConnectionConfig, openClawService.getConnectionConfig)
+  ipcMain.handle(IpcChannel.OpenClaw_SaveConnectionConfig, openClawService.saveConnectionConfig)
   ipcMain.handle(IpcChannel.OpenClaw_SyncConfig, openClawService.syncProviderConfig)
   ipcMain.handle(IpcChannel.OpenClaw_GetChannels, openClawService.getChannelStatus)
   ipcMain.handle(IpcChannel.OpenClaw_CheckUpdate, openClawService.checkUpdate)
@@ -1179,6 +1181,8 @@ export async function registerIpc(mainWindow: BrowserWindow, app: Electron.App) 
   ipcMain.handle(IpcChannel.Hermes_CheckHealth, hermesService.checkHealth)
   ipcMain.handle(IpcChannel.Hermes_GetPlatforms, hermesService.getPlatforms)
   ipcMain.handle(IpcChannel.Hermes_GetDocsUrl, hermesService.getDocsUrl)
+  ipcMain.handle(IpcChannel.Hermes_RunCommand, hermesService.runCommand)
+  ipcMain.handle(IpcChannel.Hermes_OpenInTerminal, hermesService.openInTerminal)
 
   // WeChat
   ipcMain.handle(IpcChannel.WeChat_HasCredentials, async (_, channelId: string) => {

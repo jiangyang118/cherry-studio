@@ -15,6 +15,7 @@ export const DEFAULT_SIDEBAR_ICONS: SidebarIcon[] = [
   'files',
   'code_tools',
   'notes',
+  'hermes',
   'openclaw'
 ]
 

@@ -1908,12 +1908,84 @@
       "open_home": "Open Hermes Home",
       "open_repo": "Open Repository",
       "refresh": "Refresh",
+      "run_in_terminal": "Open in iTerm",
       "start": "Start Hermes Gateway",
       "stop": "Stop Hermes Gateway",
       "view_docs": "View Documentation"
     },
+    "bundle": {
+      "actions": {
+        "createCronHooksTask": "Create Cron + Hooks Template",
+        "createDailyTask": "Create Daily Briefing Template",
+        "createPlanner": "Create Planner Preset",
+        "goToKnowledge": "Go to Knowledge",
+        "goToPlanner": "Go to Presets",
+        "goToTasks": "Go to Tasks",
+        "importKnowledge": "Import Knowledge Pack",
+        "openBundle": "Open Bundle",
+        "openFolder": "Open Folder",
+        "outputMethods": "Output Playbook Methods"
+      },
+      "cards": {
+        "knowledge": {
+          "summary": "Treat the synced Hermes playbooks bundle as a first-class Cherry knowledge pack instead of pasting the whole file into prompts.",
+          "title": "Knowledge Pack"
+        },
+        "planner": {
+          "hint": "This preset binds the imported knowledge base and keeps prompt text small so the bundle can evolve independently.",
+          "summary": "Create a reusable assistant preset that plans Cherry Studio features from Hermes playbook patterns.",
+          "title": "Planner Preset"
+        },
+        "templates": {
+          "hint": "Templates are created as paused tasks on the default autonomous agent so you can review and activate them manually.",
+          "summary": "Create paused task templates for the first two playbook-driven workflows.",
+          "title": "Task Templates"
+        }
+      },
+      "errors": {
+        "apiServerRequired": "API server must be running before task templates can be created.",
+        "bundleMissing": "Hermes playbooks bundle is missing from Cherry Studio's data directory.",
+        "embeddingModelMissing": "No embedding model is available. Configure one before importing the knowledge pack.",
+        "importFailed": "Failed to import the Hermes knowledge pack.",
+        "presetFailed": "Failed to create the Hermes planner preset.",
+        "taskAgentMissing": "No autonomous agent is available for task templates."
+      },
+      "messages": {
+        "knowledgeReady": "Hermes knowledge pack is ready.",
+        "presetCreated": "Hermes planner preset created.",
+        "presetExists": "Hermes planner preset already exists.",
+        "taskAgent": "Task agent: {{name}}",
+        "taskExists": "{{name}} already exists."
+      },
+      "planner": {
+        "name": "Hermes Playbook Planner"
+      },
+      "sectionTitle": "Knowledge Pack Actions",
+      "status": {
+        "checking": "Checking",
+        "created": "Created",
+        "createdPaused": "Created (Paused)",
+        "failed": "Import Failed",
+        "importing": "Importing",
+        "missing": "Bundle Missing",
+        "notCreated": "Not Created",
+        "notImported": "Not Imported",
+        "ready": "Ready"
+      },
+      "templates": {
+        "cronHooks": "Cron + Hooks Audit",
+        "dailyBriefing": "Daily Briefing Review"
+      }
+    },
     "checking_installation": "Checking Hermes local integration...",
     "description": "Connect the local hermes-agent repository in 099-github to Cherry Studio. This page detects the editable virtual environment, surfaces Hermes gateway runtime state, and lets you start or stop the local messaging gateway.",
+    "diagnostics": {
+      "doctor": "Doctor",
+      "errors_log": "Errors Log",
+      "gateway_log": "Gateway Log",
+      "sessions": "Recent Sessions",
+      "status_deep": "Status Deep"
+    },
     "fields": {
       "cli_path": "CLI Path",
       "exit_reason": "Exit Reason",
@@ -1939,10 +2011,77 @@
       "description": "Cherry Studio could not find a usable local Hermes checkout. Ensure /Users/jack/code/099-github/hermes-agent exists and that its virtual environment exposes the hermes CLI.",
       "title": "Hermes Repository Not Ready"
     },
+    "output": {
+      "duration": "Duration",
+      "empty": "Run a diagnostic command to inspect Hermes output here.",
+      "exit_code": "Exit Code",
+      "stderr": "stderr",
+      "stdout": "stdout"
+    },
+    "play_modes": {
+      "chat": {
+        "description": "Start the real Hermes terminal UI and chat with the agent directly.",
+        "title": "Chat UI"
+      },
+      "gateway_setup": {
+        "description": "Run the messaging gateway setup wizard for Telegram, Slack, Discord, WhatsApp and more.",
+        "title": "Gateway Setup"
+      },
+      "model": {
+        "description": "Open the model picker to configure provider and default model interactively.",
+        "title": "Model Picker"
+      },
+      "sessions": {
+        "description": "Browse or resume historical Hermes sessions in an interactive picker.",
+        "title": "Session Browser"
+      },
+      "setup": {
+        "description": "Launch the first-run setup flow for API keys, configuration, and environment checks.",
+        "title": "Setup Wizard"
+      },
+      "skills": {
+        "description": "Explore the Hermes skills hub in a real terminal session.",
+        "title": "Skills Hub"
+      }
+    },
+    "playbooks": {
+      "gateway_onboarding": {
+        "step1": "Click \"Gateway Setup\" to configure Telegram, Slack, Discord, WhatsApp or other messaging platforms in a real terminal.",
+        "step2": "When you finish the wizard, return here and use Start Hermes Gateway to bring the local gateway online.",
+        "step3": "If something fails, run Doctor or Gateway Log below to see what Hermes is missing.",
+        "summary": "Turn Hermes into a messaging agent you can talk to from external platforms.",
+        "title": "Connect Messaging Platforms"
+      },
+      "model_setup": {
+        "step1": "Open \"Model Picker\" to select the provider and default model Hermes should use.",
+        "step2": "If you have not configured keys yet, run \"Setup Wizard\" first so Hermes can write config.yaml and .env.",
+        "step3": "Use Status Deep or Doctor below to verify provider auth and model setup after you finish.",
+        "summary": "Configure the model stack before serious usage.",
+        "title": "Set Up Models"
+      },
+      "quick_start": {
+        "step1": "Click \"Chat UI\" to launch the real Hermes terminal interface.",
+        "step2": "Try one direct prompt, then use \"Status Deep\" below to see how Hermes is currently configured.",
+        "step3": "If the terminal session reports missing keys or tools, follow the Setup Wizard card next.",
+        "summary": "The fastest way to start playing with Hermes.",
+        "title": "Quick Start"
+      },
+      "skills_and_sessions": {
+        "step1": "Open \"Skills Hub\" to browse installed or available skills in the Hermes ecosystem.",
+        "step2": "Open \"Session Browser\" when you want to revisit prior conversations or cron-generated sessions.",
+        "step3": "Use Recent Sessions or Errors Log below to inspect activity without leaving Cherry Studio.",
+        "summary": "Explore procedural memory, skills, and session history.",
+        "title": "Skills and Sessions"
+      }
+    },
     "sections": {
+      "diagnostics": "Diagnostics",
       "gateway": "Gateway Runtime",
       "local_repo": "Local Repository",
+      "output": "Command Output",
       "platforms": "Messaging Platforms",
+      "play_modes": "Play Modes",
+      "playbooks": "How to Play",
       "quick_actions": "Quick Actions"
     },
     "title": "Hermes"
@@ -2969,8 +3108,25 @@
   },
   "openclaw": {
     "checking_installation": "Checking OpenClaw installation...",
+    "connection": {
+      "control_ui_base_path": "Control UI Path",
+      "control_ui_base_path_placeholder": "/openclaw",
+      "local": "Local",
+      "local_hint": "Use the local OpenClaw binary and sync Cherry Studio providers into your local config.",
+      "remote": "Remote",
+      "remote_auth_hint": "Remote mode connects to an existing gateway. Token is recommended for dashboard auto-auth and protected API calls.",
+      "remote_hint": "Connect Cherry Studio to an existing remote OpenClaw gateway without rewriting your local agents or workspaces.",
+      "remote_password": "Remote Password",
+      "remote_password_placeholder": "Optional password for remote gateway auth",
+      "remote_token": "Remote Gateway Token",
+      "remote_token_placeholder": "Optional token for remote gateway auth",
+      "remote_url": "Remote Gateway URL",
+      "remote_url_placeholder": "wss://gateway.example.com:17310",
+      "title": "Connection Mode"
+    },
     "description": "Use Cherry Studio providers to power OpenClaw, your personal AI assistant that works across WhatsApp, Telegram, Slack, Discord and more.",
     "error": {
+      "remote_url_required": "Please enter the remote gateway URL first.",
       "select_provider_model": "Please select a provider and model first"
     },
     "gateway": {
@@ -3036,6 +3192,7 @@
       "view_docs": "View Documentation"
     },
     "status": {
+      "connected": "Connected",
       "error": "Error",
       "running": "Running",
       "starting": "Starting",

@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { parseCurrentVersion, parseUpdateStatus } from '../utils/openClawParsers'
@@ -54,9 +56,31 @@ async function createService() {
   return mod.openClawService
 }
 
+function mockOpenClawConfig(config?: Record<string, unknown>) {
+  vi.spyOn(fs, 'existsSync').mockImplementation((target) => {
+    const path = String(target)
+    if (path.endsWith('/.openclaw')) return true
+    if (path.endsWith('/.openclaw/openclaw.json')) return Boolean(config)
+    return false
+  })
+
+  vi.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined)
+
+  if (config) {
+    vi.spyOn(fs, 'readFileSync').mockImplementation((target) => {
+      const path = String(target)
+      if (path.endsWith('/.openclaw/openclaw.json')) {
+        return JSON.stringify(config)
+      }
+      return ''
+    })
+  }
+}
+
 describe('OpenClawService gateway status state machine', () => {
   let service: Awaited<ReturnType<typeof createService>>
   let checkHealthSpy: ReturnType<typeof vi.spyOn>
+  let checkHealthWithErrorSpy: ReturnType<typeof vi.spyOn>
   let findBinarySpy: ReturnType<typeof vi.spyOn>
   let checkPortOpenSpy: ReturnType<typeof vi.spyOn>
   let startAndWaitSpy: ReturnType<typeof vi.spyOn>
@@ -75,6 +99,7 @@ describe('OpenClawService gateway status state machine', () => {
 
     // Spy on private methods via prototype
     checkHealthSpy = vi.spyOn(service as any, 'checkGatewayHealth')
+    checkHealthWithErrorSpy = vi.spyOn(service as any, 'checkGatewayHealthWithError')
     findBinarySpy = vi.spyOn(service as any, 'findOpenClawBinary')
     checkPortOpenSpy = vi.spyOn(service as any, 'checkPortOpen')
     startAndWaitSpy = vi.spyOn(service as any, 'startAndWaitForGateway')
@@ -91,6 +116,122 @@ describe('OpenClawService gateway status state machine', () => {
 
       const url = service.getDashboardUrl()
       expect(url).toBe(`http://127.0.0.1:18790?token=${encodeURIComponent('a b+c')}`)
+    })
+
+    it('includes local control ui base path when configured', () => {
+      // @ts-expect-error -- accessing private field for testing
+      service.gatewayAuthToken = 'local-token'
+      mockOpenClawConfig({
+        gateway: {
+          mode: 'local',
+          controlUi: {
+            basePath: '/e3b48ad9'
+          },
+          auth: {
+            token: 'local-token'
+          }
+        }
+      })
+
+      const url = service.getDashboardUrl()
+      expect(url).toBe('http://127.0.0.1:18790/e3b48ad9/?token=local-token')
+    })
+
+    it('builds remote dashboard urls from gateway.remote.url and control ui path', () => {
+      mockOpenClawConfig({
+        gateway: {
+          mode: 'remote',
+          remote: {
+            url: 'wss://robot.cpt-fit.com:17310',
+            token: 'remote-token'
+          },
+          controlUi: {
+            basePath: '/e3b48ad9'
+          }
+        }
+      })
+
+      const url = service.getDashboardUrl()
+      expect(url).toBe('http://robot.cpt-fit.com:17310/e3b48ad9/?token=remote-token')
+    })
+  })
+
+  describe('connection config', () => {
+    it('reads remote connection settings without touching local models', () => {
+      mockOpenClawConfig({
+        gateway: {
+          mode: 'remote',
+          port: 18790,
+          remote: {
+            url: 'wss://robot.cpt-fit.com:17310',
+            token: 'remote-token',
+            password: 'remote-password',
+            transport: 'direct'
+          },
+          controlUi: {
+            basePath: '/openclaw'
+          }
+        },
+        agents: {
+          defaults: {
+            model: {
+              primary: 'existing/model'
+            }
+          }
+        }
+      })
+
+      expect(service.getConnectionConfig()).toEqual({
+        mode: 'remote',
+        gatewayPort: 17310,
+        controlUiBasePath: '/openclaw',
+        remoteUrl: 'wss://robot.cpt-fit.com:17310',
+        remoteToken: 'remote-token',
+        remotePassword: 'remote-password',
+        remoteTransport: 'direct'
+      })
+    })
+
+    it('writes remote connection settings and preserves unrelated config', () => {
+      mockOpenClawConfig({
+        agents: {
+          defaults: {
+            model: {
+              primary: 'existing/model'
+            }
+          }
+        },
+        models: {
+          providers: {
+            existing: { foo: 'bar' }
+          }
+        }
+      })
+
+      const writeSpy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => undefined)
+
+      const result = service.saveConnectionConfig({} as Electron.IpcMainInvokeEvent, {
+        mode: 'remote',
+        gatewayPort: 18790,
+        controlUiBasePath: '/e3b48ad9',
+        remoteUrl: 'wss://robot.cpt-fit.com:17310',
+        remoteToken: 'remote-token',
+        remotePassword: '',
+        remoteTransport: 'direct'
+      })
+
+      expect(result).toEqual({ success: true })
+
+      const writtenConfig = JSON.parse(String(writeSpy.mock.calls[0]?.[1] ?? '{}'))
+      expect(writtenConfig.agents.defaults.model.primary).toBe('existing/model')
+      expect(writtenConfig.models.providers.existing).toEqual({ foo: 'bar' })
+      expect(writtenConfig.gateway.mode).toBe('remote')
+      expect(writtenConfig.gateway.remote).toEqual({
+        url: 'wss://robot.cpt-fit.com:17310',
+        token: 'remote-token',
+        transport: 'direct'
+      })
+      expect(writtenConfig.gateway.controlUi).toEqual({ basePath: '/e3b48ad9' })
     })
   })
 
@@ -326,6 +467,29 @@ describe('OpenClawService gateway status state machine', () => {
 
       // @ts-expect-error -- accessing private field
       expect(service.gatewayPort).toBe(9999)
+    })
+
+    it('connects to a configured remote gateway without local binary startup', async () => {
+      mockOpenClawConfig({
+        gateway: {
+          mode: 'remote',
+          remote: {
+            url: 'wss://robot.cpt-fit.com:17310',
+            token: 'remote-token'
+          }
+        }
+      })
+      checkHealthWithErrorSpy.mockResolvedValue({ status: 'healthy' })
+
+      const result = await service.startGateway(event)
+
+      expect(result).toEqual({ success: true })
+      expect(findBinarySpy).not.toHaveBeenCalled()
+      expect(startAndWaitSpy).not.toHaveBeenCalled()
+      // @ts-expect-error -- accessing private field
+      expect(service.gatewayStatus).toBe('running')
+      // @ts-expect-error -- accessing private field
+      expect(service.gatewayPort).toBe(17310)
     })
   })
 

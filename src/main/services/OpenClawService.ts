@@ -48,6 +48,16 @@ export interface OpenClawConfig {
     port?: number
     auth?: {
       token?: string
+      password?: string
+    }
+    remote?: {
+      url?: string
+      token?: string
+      password?: string
+      transport?: 'ssh' | 'direct'
+    }
+    controlUi?: {
+      basePath?: string
     }
   }
   agents?: {
@@ -75,6 +85,16 @@ export interface OpenClawProviderConfig {
   apiKey: string
   api: string
   models: OpenClawModelConfig[]
+}
+
+export interface OpenClawConnectionConfig {
+  mode: 'local' | 'remote'
+  gatewayPort: number
+  controlUiBasePath: string
+  remoteUrl: string
+  remoteToken: string
+  remotePassword: string
+  remoteTransport: 'ssh' | 'direct'
 }
 
 /**
@@ -124,6 +144,51 @@ function isVertexProvider(provider: Provider): provider is VertexProvider {
   return provider.type === 'vertexai'
 }
 
+function normalizeControlUiBasePath(value?: string): string {
+  const trimmed = value?.trim() ?? ''
+  if (!trimmed || trimmed === '/') {
+    return ''
+  }
+
+  const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+  return withoutTrailingSlash(withLeadingSlash)
+}
+
+function toDisplayGatewayUrl(value?: string): string {
+  const trimmed = value?.trim() ?? ''
+  if (!trimmed) {
+    return ''
+  }
+
+  try {
+    const parsed = new URL(trimmed)
+    if (parsed.protocol === 'ws:') {
+      parsed.protocol = 'http:'
+    } else if (parsed.protocol === 'wss:') {
+      parsed.protocol = 'https:'
+    }
+    return withoutTrailingSlash(parsed.toString())
+  } catch {
+    return trimmed
+  }
+}
+
+function normalizeRemoteGatewayUrlInput(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return ''
+  }
+
+  const parsed = new URL(trimmed)
+  if (parsed.protocol === 'http:') {
+    parsed.protocol = 'ws:'
+  } else if (parsed.protocol === 'https:') {
+    parsed.protocol = 'wss:'
+  }
+
+  return withoutTrailingSlash(parsed.toString())
+}
+
 class OpenClawService {
   private gatewayStatus: GatewayStatus = 'stopped'
   private gatewayPort: number = DEFAULT_GATEWAY_PORT
@@ -142,10 +207,238 @@ class OpenClawService {
     this.getStatus = this.getStatus.bind(this)
     this.checkHealth = this.checkHealth.bind(this)
     this.getDashboardUrl = this.getDashboardUrl.bind(this)
+    this.getConnectionConfig = this.getConnectionConfig.bind(this)
+    this.saveConnectionConfig = this.saveConnectionConfig.bind(this)
     this.syncProviderConfig = this.syncProviderConfig.bind(this)
     this.getChannelStatus = this.getChannelStatus.bind(this)
     this.checkUpdate = this.checkUpdate.bind(this)
     this.performUpdate = this.performUpdate.bind(this)
+  }
+
+  private ensureConfigDirectoryAndMigrate(): void {
+    if (!fs.existsSync(OPENCLAW_CONFIG_DIR)) {
+      fs.mkdirSync(OPENCLAW_CONFIG_DIR, { recursive: true })
+    }
+
+    if (fs.existsSync(OPENCLAW_LEGACY_CONFIG_PATH)) {
+      if (fs.existsSync(OPENCLAW_CONFIG_PATH)) {
+        fs.renameSync(OPENCLAW_CONFIG_PATH, OPENCLAW_CONFIG_BAK_PATH)
+        logger.info('Migrated openclaw.json → openclaw.json.bak')
+      }
+      fs.renameSync(OPENCLAW_LEGACY_CONFIG_PATH, OPENCLAW_CONFIG_PATH)
+      logger.info('Migrated openclaw.cherry.json → openclaw.json')
+    }
+  }
+
+  private readConfig(): OpenClawConfig {
+    this.ensureConfigDirectoryAndMigrate()
+
+    if (!fs.existsSync(OPENCLAW_CONFIG_PATH)) {
+      return {}
+    }
+
+    try {
+      const content = fs.readFileSync(OPENCLAW_CONFIG_PATH, 'utf-8')
+      return JSON.parse(content) as OpenClawConfig
+    } catch (error) {
+      logger.warn('Failed to parse existing OpenClaw config, using empty config', error as Error)
+      return {}
+    }
+  }
+
+  private writeConfig(config: OpenClawConfig): void {
+    this.ensureConfigDirectoryAndMigrate()
+    fs.writeFileSync(OPENCLAW_CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8')
+  }
+
+  private isRemoteMode(config: OpenClawConfig): boolean {
+    if (config.gateway?.mode === 'remote') {
+      return true
+    }
+
+    return Boolean(config.gateway?.remote?.url?.trim())
+  }
+
+  private resolveGatewayPortFromUrl(rawUrl?: string): number | null {
+    if (!rawUrl?.trim()) {
+      return null
+    }
+
+    try {
+      const parsed = new URL(rawUrl)
+      if (parsed.port) {
+        return Number(parsed.port)
+      }
+      return parsed.protocol === 'wss:' || parsed.protocol === 'https:' ? 443 : 80
+    } catch {
+      return null
+    }
+  }
+
+  private buildRemoteHttpBaseUrls(config: OpenClawConfig): string[] {
+    const rawUrl = config.gateway?.remote?.url?.trim()
+    if (!rawUrl) {
+      return []
+    }
+
+    try {
+      const parsed = new URL(rawUrl)
+      const protocols = parsed.protocol === 'wss:' ? ['https:', 'http:'] : ['http:']
+      const urls = protocols.map((protocol) => {
+        const next = new URL(rawUrl)
+        next.protocol = protocol
+        next.pathname = ''
+        next.search = ''
+        next.hash = ''
+        return withoutTrailingSlash(next.toString())
+      })
+
+      return [...new Set(urls)]
+    } catch {
+      return []
+    }
+  }
+
+  private async resolveReachableRemoteHttpBaseUrl(config: OpenClawConfig): Promise<string | null> {
+    const candidates = this.buildRemoteHttpBaseUrls(config)
+    for (const baseUrl of candidates) {
+      try {
+        const response = await fetch(`${baseUrl}/health`, {
+          signal: AbortSignal.timeout(3000)
+        })
+        if (response.ok) {
+          return baseUrl
+        }
+      } catch {
+        // Try next candidate
+      }
+    }
+
+    return candidates[0] ?? null
+  }
+
+  private async buildGatewayHttpUrl(config: OpenClawConfig, pathname: string): Promise<string | null> {
+    const normalizedPath = pathname.startsWith('/') ? pathname : `/${pathname}`
+    if (this.isRemoteMode(config)) {
+      const baseUrl = await this.resolveReachableRemoteHttpBaseUrl(config)
+      return baseUrl ? `${baseUrl}${normalizedPath}` : null
+    }
+
+    return `http://127.0.0.1:${this.gatewayPort}${normalizedPath}`
+  }
+
+  private buildGatewayAuthHeaders(config: OpenClawConfig): Record<string, string> {
+    if (this.isRemoteMode(config)) {
+      const token = config.gateway?.remote?.token?.trim()
+      const password = config.gateway?.remote?.password?.trim()
+
+      if (token) {
+        return { Authorization: `Bearer ${token}` }
+      }
+
+      if (password) {
+        return { 'x-openclaw-password': password }
+      }
+
+      return {}
+    }
+
+    if (!this.gatewayAuthToken) {
+      this.loadAuthTokenFromConfig()
+    }
+
+    if (this.gatewayAuthToken) {
+      return { Authorization: `Bearer ${this.gatewayAuthToken}` }
+    }
+
+    const password = config.gateway?.auth?.password?.trim()
+    return password ? { 'x-openclaw-password': password } : {}
+  }
+
+  public getConnectionConfig(): OpenClawConnectionConfig {
+    const config = this.readConfig()
+    const isRemote = this.isRemoteMode(config)
+    const remoteUrl = config.gateway?.remote?.url?.trim() ?? ''
+
+    return {
+      mode: isRemote ? 'remote' : 'local',
+      gatewayPort: isRemote
+        ? (this.resolveGatewayPortFromUrl(remoteUrl) ?? config.gateway?.port ?? this.gatewayPort)
+        : (config.gateway?.port ?? this.gatewayPort),
+      controlUiBasePath: normalizeControlUiBasePath(config.gateway?.controlUi?.basePath),
+      remoteUrl: toDisplayGatewayUrl(remoteUrl),
+      remoteToken: config.gateway?.remote?.token?.trim() ?? '',
+      remotePassword: config.gateway?.remote?.password?.trim() ?? '',
+      remoteTransport: config.gateway?.remote?.transport === 'direct' ? 'direct' : 'ssh'
+    }
+  }
+
+  public saveConnectionConfig(_: Electron.IpcMainInvokeEvent, nextConfig: OpenClawConnectionConfig): OperationResult {
+    try {
+      const config = this.readConfig()
+      const controlUiBasePath = normalizeControlUiBasePath(nextConfig.controlUiBasePath)
+
+      config.gateway = config.gateway || {}
+      if (controlUiBasePath) {
+        config.gateway.controlUi = { ...config.gateway.controlUi, basePath: controlUiBasePath }
+      } else if (config.gateway.controlUi) {
+        delete config.gateway.controlUi.basePath
+      }
+
+      if (nextConfig.mode === 'remote') {
+        if (!nextConfig.remoteUrl.trim()) {
+          return { success: false, message: 'Remote gateway URL is required.' }
+        }
+
+        try {
+          const parsed = new URL(nextConfig.remoteUrl.trim())
+          if (!['http:', 'https:', 'ws:', 'wss:'].includes(parsed.protocol)) {
+            return { success: false, message: 'Remote gateway URL must use http(s):// or ws(s)://.' }
+          }
+        } catch {
+          return { success: false, message: 'Remote gateway URL is invalid.' }
+        }
+
+        const remoteUrl = normalizeRemoteGatewayUrlInput(nextConfig.remoteUrl)
+
+        config.gateway.mode = 'remote'
+        config.gateway.remote = config.gateway.remote || {}
+        config.gateway.remote.url = remoteUrl
+        config.gateway.remote.transport = nextConfig.remoteTransport
+
+        const remoteToken = nextConfig.remoteToken.trim()
+        const remotePassword = nextConfig.remotePassword.trim()
+
+        if (remoteToken) {
+          config.gateway.remote.token = remoteToken
+        } else {
+          delete config.gateway.remote.token
+        }
+
+        if (remotePassword) {
+          config.gateway.remote.password = remotePassword
+        } else {
+          delete config.gateway.remote.password
+        }
+
+        const remotePort = this.resolveGatewayPortFromUrl(remoteUrl)
+        if (remotePort) {
+          this.gatewayPort = remotePort
+        }
+      } else {
+        config.gateway.mode = 'local'
+        config.gateway.port = nextConfig.gatewayPort
+        this.gatewayPort = nextConfig.gatewayPort
+      }
+
+      this.writeConfig(config)
+      logger.info(`Saved OpenClaw connection mode: ${nextConfig.mode}`)
+      return { success: true }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      logger.error('Failed to save OpenClaw connection config:', error as Error)
+      return { success: false, message: errorMessage }
+    }
   }
 
   /**
@@ -337,6 +630,27 @@ class OpenClawService {
    * Start the OpenClaw Gateway
    */
   public async startGateway(_: Electron.IpcMainInvokeEvent, port?: number): Promise<OperationResult> {
+    const config = this.readConfig()
+    if (this.isRemoteMode(config)) {
+      const remoteUrl = config.gateway?.remote?.url?.trim()
+      if (!remoteUrl) {
+        return { success: false, message: 'Remote gateway URL is not configured.' }
+      }
+
+      this.gatewayPort = this.resolveGatewayPortFromUrl(remoteUrl) ?? this.gatewayPort
+      this.gatewayStatus = 'starting'
+
+      const { status, error } = await this.checkGatewayHealthWithError()
+      if (status === 'healthy') {
+        this.gatewayStatus = 'running'
+        logger.info(`Connected to remote gateway: ${remoteUrl}`)
+        return { success: true }
+      }
+
+      this.gatewayStatus = 'error'
+      return { success: false, message: error || 'Remote gateway is unreachable.' }
+    }
+
     this.gatewayPort = port ?? DEFAULT_GATEWAY_PORT
 
     // Prevent concurrent startup calls
@@ -486,6 +800,13 @@ class OpenClawService {
    * Kills all openclaw processes to ensure clean shutdown.
    */
   public async stopGateway(): Promise<OperationResult> {
+    const config = this.readConfig()
+    if (this.isRemoteMode(config)) {
+      this.gatewayStatus = 'stopped'
+      logger.info('Disconnected remote gateway session')
+      return { success: true }
+    }
+
     try {
       this.killAllOpenClawProcesses()
 
@@ -601,6 +922,16 @@ class OpenClawService {
    * Get Gateway status. Probes the port when idle to detect externally-started gateways.
    */
   public async getStatus(): Promise<{ status: GatewayStatus; port: number }> {
+    const config = this.readConfig()
+    if (this.isRemoteMode(config)) {
+      const remotePort = this.resolveGatewayPortFromUrl(config.gateway?.remote?.url) ?? this.gatewayPort
+      this.gatewayPort = remotePort
+
+      const { status } = await this.checkGatewayHealth()
+      this.gatewayStatus = status === 'healthy' ? 'running' : 'stopped'
+      return { status: this.gatewayStatus, port: this.gatewayPort }
+    }
+
     if (this.gatewayStatus === 'starting') {
       return { status: this.gatewayStatus, port: this.gatewayPort }
     }
@@ -625,6 +956,13 @@ class OpenClawService {
    * Returns unhealthy immediately if we know the gateway is not running.
    */
   public async checkHealth(): Promise<HealthInfo> {
+    const config = this.readConfig()
+    if (this.isRemoteMode(config)) {
+      const healthInfo = await this.checkGatewayHealth()
+      this.gatewayStatus = healthInfo.status === 'healthy' ? 'running' : 'stopped'
+      return healthInfo
+    }
+
     if (this.gatewayStatus !== 'running') {
       return { status: 'unhealthy', gatewayPort: this.gatewayPort }
     }
@@ -644,8 +982,14 @@ class OpenClawService {
    * externally-started gateways should call this directly.
    */
   private async checkGatewayHealth(): Promise<HealthInfo> {
+    const config = this.readConfig()
+    const healthUrl = await this.buildGatewayHttpUrl(config, '/health')
+    if (!healthUrl) {
+      return { status: 'unhealthy', gatewayPort: this.gatewayPort }
+    }
+
     try {
-      const response = await fetch(`http://127.0.0.1:${this.gatewayPort}/health`, {
+      const response = await fetch(healthUrl, {
         signal: AbortSignal.timeout(3000)
       })
       if (response.ok) {
@@ -695,11 +1039,29 @@ class OpenClawService {
    * The Control UI uses ?token= to auto-authenticate the WebSocket connection.
    */
   public getDashboardUrl(): string {
+    const config = this.readConfig()
+    const controlUiBasePath = normalizeControlUiBasePath(config.gateway?.controlUi?.basePath)
+    const controlUiPath = controlUiBasePath ? `${controlUiBasePath}/` : ''
+    if (this.isRemoteMode(config)) {
+      const remoteHttpBaseUrls = this.buildRemoteHttpBaseUrls(config)
+      const baseUrl = remoteHttpBaseUrls.at(-1) ?? null
+      if (!baseUrl) {
+        return ''
+      }
+
+      const remoteToken = config.gateway?.remote?.token?.trim()
+      let url = `${baseUrl}${controlUiPath}`
+      if (remoteToken) {
+        url += `?token=${encodeURIComponent(remoteToken)}`
+      }
+      return url
+    }
+
     // Ensure we have the token (may have been lost after app restart)
     if (!this.gatewayAuthToken) {
       this.loadAuthTokenFromConfig()
     }
-    let url = `http://127.0.0.1:${this.gatewayPort}`
+    let url = `http://127.0.0.1:${this.gatewayPort}${controlUiPath}`
     if (this.gatewayAuthToken) {
       // Use query string (not URL fragment) so dashboard app state can persist correctly.
       // Fragment (#...) is often used by SPAs for transient client-side state.
@@ -744,30 +1106,7 @@ class OpenClawService {
   ): Promise<OperationResult> {
     try {
       // Ensure config directory exists
-      if (!fs.existsSync(OPENCLAW_CONFIG_DIR)) {
-        fs.mkdirSync(OPENCLAW_CONFIG_DIR, { recursive: true })
-      }
-
-      // Migrate legacy openclaw.cherry.json → openclaw.json
-      if (fs.existsSync(OPENCLAW_LEGACY_CONFIG_PATH)) {
-        if (fs.existsSync(OPENCLAW_CONFIG_PATH)) {
-          fs.renameSync(OPENCLAW_CONFIG_PATH, OPENCLAW_CONFIG_BAK_PATH)
-          logger.info('Migrated openclaw.json → openclaw.json.bak')
-        }
-        fs.renameSync(OPENCLAW_LEGACY_CONFIG_PATH, OPENCLAW_CONFIG_PATH)
-        logger.info('Migrated openclaw.cherry.json → openclaw.json')
-      }
-
-      // Read existing config
-      let config: OpenClawConfig = {}
-      if (fs.existsSync(OPENCLAW_CONFIG_PATH)) {
-        try {
-          const content = fs.readFileSync(OPENCLAW_CONFIG_PATH, 'utf-8')
-          config = JSON.parse(content)
-        } catch {
-          logger.warn('Failed to parse existing OpenClaw config, creating new one')
-        }
-      }
+      const config = this.readConfig()
 
       // Build provider key
       const providerKey = `cherry-${provider.id}`
@@ -846,7 +1185,7 @@ class OpenClawService {
       }
 
       // Write config file
-      fs.writeFileSync(OPENCLAW_CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8')
+      this.writeConfig(config)
 
       logger.info(`Synced provider ${provider.id} to OpenClaw config`)
       return { success: true }
@@ -951,8 +1290,15 @@ class OpenClawService {
    * Get connected channel status
    */
   public async getChannelStatus(): Promise<ChannelInfo[]> {
+    const config = this.readConfig()
+    const channelsUrl = await this.buildGatewayHttpUrl(config, '/api/channels')
+    if (!channelsUrl) {
+      return []
+    }
+
     try {
-      const response = await fetch(`http://127.0.0.1:${this.gatewayPort}/api/channels`, {
+      const response = await fetch(channelsUrl, {
+        headers: this.buildGatewayAuthHeaders(config),
         signal: AbortSignal.timeout(5000)
       })
       if (response.ok) {
@@ -972,8 +1318,14 @@ class OpenClawService {
    * Expected response: {"ok":true,"status":"live"}
    */
   private async checkGatewayHealthWithError(): Promise<{ status: 'healthy' | 'unhealthy'; error?: string }> {
+    const config = this.readConfig()
+    const healthUrl = await this.buildGatewayHttpUrl(config, '/health')
+    if (!healthUrl) {
+      return { status: 'unhealthy', error: 'Gateway health URL is not configured.' }
+    }
+
     try {
-      const response = await fetch(`http://127.0.0.1:${this.gatewayPort}/health`, {
+      const response = await fetch(healthUrl, {
         signal: AbortSignal.timeout(3000)
       })
       if (response.ok) {

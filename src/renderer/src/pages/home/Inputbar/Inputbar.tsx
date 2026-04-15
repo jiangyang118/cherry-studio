@@ -73,6 +73,7 @@ interface Props {
   assistant: Assistant
   setActiveTopic: (topic: Topic) => void
   topic: Topic
+  initialPrompt?: string
 }
 
 type ProviderActionHandlers = {
@@ -88,7 +89,7 @@ interface InputbarInnerProps extends Props {
   actionsRef: React.RefObject<ProviderActionHandlers>
 }
 
-const Inputbar: FC<Props> = ({ assistant: initialAssistant, setActiveTopic, topic }) => {
+const Inputbar: FC<Props> = ({ assistant: initialAssistant, setActiveTopic, topic, initialPrompt }) => {
   const actionsRef = useRef<ProviderActionHandlers>({
     resizeTextArea: () => {},
     addNewTopic: () => {},
@@ -127,13 +128,20 @@ const Inputbar: FC<Props> = ({ assistant: initialAssistant, setActiveTopic, topi
         assistant={initialAssistant}
         setActiveTopic={setActiveTopic}
         topic={topic}
+        initialPrompt={initialPrompt}
         actionsRef={actionsRef}
       />
     </InputbarToolsProvider>
   )
 }
 
-const InputbarInner: FC<InputbarInnerProps> = ({ assistant: initialAssistant, setActiveTopic, topic, actionsRef }) => {
+const InputbarInner: FC<InputbarInnerProps> = ({
+  assistant: initialAssistant,
+  setActiveTopic,
+  topic,
+  initialPrompt,
+  actionsRef
+}) => {
   const scope = topic.type ?? TopicType.Chat
   const config = getInputbarConfig(scope)
 
@@ -427,6 +435,16 @@ const InputbarInner: FC<InputbarInnerProps> = ({ assistant: initialAssistant, se
     mentionedModels,
     focusTextarea
   ])
+
+  useEffect(() => {
+    if (!initialPrompt?.trim()) {
+      return
+    }
+
+    setText(initialPrompt)
+    setTimeoutTimer('inputbar_initial_prompt_resize', () => resizeTextArea(), 0)
+    setTimeoutTimer('inputbar_initial_prompt_focus', () => focusTextarea(), 0)
+  }, [focusTextarea, initialPrompt, resizeTextArea, setText, setTimeoutTimer])
 
   // TODO: Just use assistant.knowledge_bases as selectedKnowledgeBases. context state is overdesigned.
   useEffect(() => {

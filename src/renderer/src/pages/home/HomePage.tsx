@@ -29,6 +29,7 @@ const HomePage: FC = () => {
 
   const location = useLocation()
   const state = location.state
+  const initialPrompt = state?.draftPrompt
 
   const [activeAssistant, _setActiveAssistant] = useState<Assistant>(
     state?.assistant || _activeAssistant || assistants[0]
@@ -155,6 +156,7 @@ const HomePage: FC = () => {
             activeTopic={activeTopic}
             setActiveTopic={setActiveTopic}
             setActiveAssistant={setActiveAssistant}
+            initialPrompt={initialPrompt}
           />
         </ErrorBoundary>
       </ContentContainer>

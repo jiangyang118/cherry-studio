@@ -1,11 +1,13 @@
 import { Navbar, NavbarCenter } from '@renderer/components/app/Navbar'
 import { loggerService } from '@renderer/services/LoggerService'
-import { Alert, Avatar, Button, Descriptions, Result, Space, Spin, Tag } from 'antd'
-import { Bot, ExternalLink, FolderOpen, Play, RefreshCw, Square } from 'lucide-react'
-import type { FC } from 'react'
+import { Alert, Avatar, Button, Card, Descriptions, Result, Space, Spin, Tag, Typography } from 'antd'
+import { Bot, ExternalLink, FolderOpen, Play, RefreshCw, Settings, Square, Stethoscope, Terminal } from 'lucide-react'
+import type { FC, ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
+
+import HermesKnowledgePackSection from './HermesKnowledgePackSection'
 
 const logger = loggerService.withContext('HermesPage')
 
@@ -34,6 +36,20 @@ interface HermesHealthInfo {
   updatedAt: string | null
   pid: number | null
   platforms: HermesPlatformInfo[]
+}
+
+type HermesCommandId = 'statusDeep' | 'doctor' | 'sessionsList' | 'logsErrors' | 'logsGateway'
+type HermesTerminalActionId = 'chat' | 'setup' | 'gatewaySetup' | 'model' | 'skills' | 'sessionsBrowse'
+
+interface HermesCommandResult {
+  success: boolean
+  id: HermesCommandId
+  label: string
+  command: string
+  exitCode: number | null
+  stdout: string
+  stderr: string
+  durationMs: number
 }
 
 const DEFAULT_DOCS_URL = 'https://hermes-agent.nousresearch.com/docs/'
@@ -84,6 +100,9 @@ const HermesPage: FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
+  const [runningCommand, setRunningCommand] = useState<HermesCommandId | null>(null)
+  const [launchingAction, setLaunchingAction] = useState<HermesTerminalActionId | null>(null)
+  const [commandResult, setCommandResult] = useState<HermesCommandResult | null>(null)
 
   const checkInstallation = useCallback(async () => {
     try {
@@ -223,6 +242,157 @@ const HermesPage: FC = () => {
     }
   }, [installInfo?.hermesHome])
 
+  const runCommand = useCallback(async (id: HermesCommandId) => {
+    setRunningCommand(id)
+    try {
+      const result = await window.api.hermes.runCommand(id)
+      setCommandResult(result)
+    } catch (err) {
+      logger.error('Failed to run Hermes command', err as Error)
+      setCommandResult({
+        success: false,
+        id,
+        label: id,
+        command: id,
+        exitCode: null,
+        stdout: '',
+        stderr: err instanceof Error ? err.message : String(err),
+        durationMs: 0
+      })
+    } finally {
+      setRunningCommand(null)
+    }
+  }, [])
+
+  const openTerminalAction = useCallback(
+    async (id: HermesTerminalActionId) => {
+      setLaunchingAction(id)
+      try {
+        const result = await window.api.hermes.openInTerminal(id)
+        if (!result.success) {
+          setError(result.message || t('hermes.actions.run_in_terminal'))
+        }
+      } catch (err) {
+        logger.error('Failed to open Hermes terminal action', err as Error)
+        setError(err instanceof Error ? err.message : String(err))
+      } finally {
+        setLaunchingAction(null)
+      }
+    },
+    [t]
+  )
+
+  const openChatUi = useCallback(() => {
+    void openTerminalAction('chat')
+  }, [openTerminalAction])
+
+  const interactiveActions = useMemo(
+    () =>
+      [
+        {
+          id: 'chat',
+          title: t('hermes.play_modes.chat.title'),
+          description: t('hermes.play_modes.chat.description'),
+          icon: <Bot size={18} />
+        },
+        {
+          id: 'setup',
+          title: t('hermes.play_modes.setup.title'),
+          description: t('hermes.play_modes.setup.description'),
+          icon: <Settings size={18} />
+        },
+        {
+          id: 'gatewaySetup',
+          title: t('hermes.play_modes.gateway_setup.title'),
+          description: t('hermes.play_modes.gateway_setup.description'),
+          icon: <Play size={18} />
+        },
+        {
+          id: 'model',
+          title: t('hermes.play_modes.model.title'),
+          description: t('hermes.play_modes.model.description'),
+          icon: <RefreshCw size={18} />
+        },
+        {
+          id: 'skills',
+          title: t('hermes.play_modes.skills.title'),
+          description: t('hermes.play_modes.skills.description'),
+          icon: <Terminal size={18} />
+        },
+        {
+          id: 'sessionsBrowse',
+          title: t('hermes.play_modes.sessions.title'),
+          description: t('hermes.play_modes.sessions.description'),
+          icon: <FolderOpen size={18} />
+        }
+      ] satisfies Array<{ id: HermesTerminalActionId; title: string; description: string; icon: ReactNode }>,
+    [t]
+  )
+
+  const inspectActions = useMemo(
+    () =>
+      [
+        { id: 'statusDeep', label: t('hermes.diagnostics.status_deep') },
+        { id: 'doctor', label: t('hermes.diagnostics.doctor') },
+        { id: 'sessionsList', label: t('hermes.diagnostics.sessions') },
+        { id: 'logsErrors', label: t('hermes.diagnostics.errors_log') },
+        { id: 'logsGateway', label: t('hermes.diagnostics.gateway_log') }
+      ] satisfies Array<{ id: HermesCommandId; label: string }>,
+    [t]
+  )
+
+  const playbookCards = useMemo(
+    () => [
+      {
+        key: 'quick_start',
+        title: t('hermes.playbooks.quick_start.title'),
+        summary: t('hermes.playbooks.quick_start.summary'),
+        steps: [
+          t('hermes.playbooks.quick_start.step1'),
+          t('hermes.playbooks.quick_start.step2'),
+          t('hermes.playbooks.quick_start.step3')
+        ]
+      },
+      {
+        key: 'model_setup',
+        title: t('hermes.playbooks.model_setup.title'),
+        summary: t('hermes.playbooks.model_setup.summary'),
+        steps: [
+          t('hermes.playbooks.model_setup.step1'),
+          t('hermes.playbooks.model_setup.step2'),
+          t('hermes.playbooks.model_setup.step3')
+        ]
+      },
+      {
+        key: 'gateway_onboarding',
+        title: t('hermes.playbooks.gateway_onboarding.title'),
+        summary: t('hermes.playbooks.gateway_onboarding.summary'),
+        steps: [
+          t('hermes.playbooks.gateway_onboarding.step1'),
+          t('hermes.playbooks.gateway_onboarding.step2'),
+          t('hermes.playbooks.gateway_onboarding.step3')
+        ]
+      },
+      {
+        key: 'skills_and_sessions',
+        title: t('hermes.playbooks.skills_and_sessions.title'),
+        summary: t('hermes.playbooks.skills_and_sessions.summary'),
+        steps: [
+          t('hermes.playbooks.skills_and_sessions.step1'),
+          t('hermes.playbooks.skills_and_sessions.step2'),
+          t('hermes.playbooks.skills_and_sessions.step3')
+        ]
+      }
+    ],
+    [t]
+  )
+
+  useEffect(() => {
+    if (pageState === 'ready' && !commandResult && !runningCommand) {
+      void runCommand('statusDeep')
+    }
+  }, [commandResult, pageState, runCommand, runningCommand])
+
   return (
     <div className="size-full">
       <Navbar>
@@ -304,7 +474,22 @@ const HermesPage: FC = () => {
               </Descriptions.Item>
             </Descriptions>
 
-            <Descriptions title={t('hermes.sections.platforms')} column={1} bordered size="small">
+            <Descriptions
+              title={
+                <div className="flex items-center justify-between gap-3">
+                  <span>{t('hermes.sections.platforms')}</span>
+                  <Button
+                    size="small"
+                    icon={<Bot size={14} />}
+                    loading={launchingAction === 'chat'}
+                    onClick={openChatUi}>
+                    {t('hermes.play_modes.chat.title')}
+                  </Button>
+                </div>
+              }
+              column={1}
+              bordered
+              size="small">
               <Descriptions.Item label={t('hermes.fields.platforms')}>
                 {healthInfo?.platforms.length ? (
                   <Space wrap>
@@ -352,6 +537,13 @@ const HermesPage: FC = () => {
                 <Button icon={<RefreshCw size={16} />} loading={isRefreshing} onClick={() => void refreshRuntime()}>
                   {t('hermes.actions.refresh')}
                 </Button>
+                <Button
+                  type="primary"
+                  icon={<Bot size={16} />}
+                  loading={launchingAction === 'chat'}
+                  onClick={openChatUi}>
+                  {t('hermes.play_modes.chat.title')}
+                </Button>
                 <Button icon={<FolderOpen size={16} />} onClick={openRepo}>
                   {t('hermes.actions.open_repo')}
                 </Button>
@@ -363,6 +555,113 @@ const HermesPage: FC = () => {
                 </Button>
               </Space>
             </div>
+
+            <div>
+              <div className="mb-2 font-medium text-sm" style={{ color: 'var(--color-text-1)' }}>
+                {t('hermes.sections.play_modes')}
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {interactiveActions.map((action) => (
+                  <Card key={action.id} size="small">
+                    <div className="flex h-full flex-col gap-3">
+                      <div
+                        className="flex items-center gap-2 font-medium text-sm"
+                        style={{ color: 'var(--color-text-1)' }}>
+                        {action.icon}
+                        <span>{action.title}</span>
+                      </div>
+                      <div className="min-h-[48px] text-sm" style={{ color: 'var(--color-text-2)' }}>
+                        {action.description}
+                      </div>
+                      <Button
+                        icon={<Terminal size={16} />}
+                        loading={launchingAction === action.id}
+                        onClick={() => void openTerminalAction(action.id)}>
+                        {t('hermes.actions.run_in_terminal')}
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-2 font-medium text-sm" style={{ color: 'var(--color-text-1)' }}>
+                {t('hermes.sections.playbooks')}
+              </div>
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                {playbookCards.map((card) => (
+                  <Card key={card.key} size="small" title={card.title}>
+                    <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+                      {card.summary}
+                    </Typography.Paragraph>
+                    <ol className="mb-0 pl-5 text-sm leading-7" style={{ color: 'var(--color-text-1)' }}>
+                      {card.steps.map((step, index) => (
+                        <li key={index}>{step}</li>
+                      ))}
+                    </ol>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            <HermesKnowledgePackSection />
+
+            <div>
+              <div className="mb-2 font-medium text-sm" style={{ color: 'var(--color-text-1)' }}>
+                {t('hermes.sections.diagnostics')}
+              </div>
+              <Space wrap>
+                {inspectActions.map((action) => (
+                  <Button
+                    key={action.id}
+                    icon={<Stethoscope size={16} />}
+                    loading={runningCommand === action.id}
+                    onClick={() => void runCommand(action.id)}>
+                    {action.label}
+                  </Button>
+                ))}
+              </Space>
+            </div>
+
+            <Card size="small" title={t('hermes.sections.output')}>
+              {commandResult ? (
+                <div className="flex flex-col gap-3">
+                  <Space wrap>
+                    <Tag color={commandResult.success ? 'success' : 'error'}>{commandResult.label}</Tag>
+                    <Tag>{`${t('hermes.output.duration')}: ${commandResult.durationMs}ms`}</Tag>
+                    <Tag>{`${t('hermes.output.exit_code')}: ${commandResult.exitCode ?? 'null'}`}</Tag>
+                  </Space>
+                  <Typography.Text copyable={{ text: commandResult.command }} code>
+                    {commandResult.command}
+                  </Typography.Text>
+                  {commandResult.stdout && (
+                    <div>
+                      <div className="mb-1 font-medium text-xs" style={{ color: 'var(--color-text-2)' }}>
+                        {t('hermes.output.stdout')}
+                      </div>
+                      <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-[var(--color-background-soft)] p-3 text-xs">
+                        {commandResult.stdout}
+                      </pre>
+                    </div>
+                  )}
+                  {commandResult.stderr && (
+                    <div>
+                      <div className="mb-1 font-medium text-xs" style={{ color: 'var(--color-text-2)' }}>
+                        {t('hermes.output.stderr')}
+                      </div>
+                      <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-[var(--color-background-soft)] p-3 text-xs">
+                        {commandResult.stderr}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-sm" style={{ color: 'var(--color-text-2)' }}>
+                  {t('hermes.output.empty')}
+                </div>
+              )}
+            </Card>
           </div>
         )}
       </div>

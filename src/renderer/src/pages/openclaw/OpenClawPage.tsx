@@ -9,12 +9,13 @@ import { useAppDispatch, useAppSelector } from '@renderer/store'
 import {
   type GatewayStatus,
   type HealthInfo,
+  setGatewayPort,
   setGatewayStatus,
   setLastHealthCheck,
   setSelectedModelUniqId
 } from '@renderer/store/openclaw'
 import { IpcChannel } from '@shared/IpcChannel'
-import { Alert, Avatar, Button, Result, Space, Spin } from 'antd'
+import { Alert, Avatar, Button, Input, Radio, Result, Space, Spin } from 'antd'
 import { Download, ExternalLink, Play, Square } from 'lucide-react'
 import type { FC } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -26,6 +27,18 @@ import UpdateButton from './components/UpdateButton'
 const logger = loggerService.withContext('OpenClawPage')
 
 const DEFAULT_DOCS_URL = 'https://docs.openclaw.ai/'
+
+type ConnectionMode = 'local' | 'remote'
+
+interface OpenClawConnectionConfig {
+  mode: ConnectionMode
+  gatewayPort: number
+  controlUiBasePath: string
+  remoteUrl: string
+  remoteToken: string
+  remotePassword: string
+  remoteTransport: 'ssh' | 'direct'
+}
 
 interface TitleSectionProps {
   title: string
@@ -73,17 +86,21 @@ const OpenClawPage: FC = () => {
   const { gatewayStatus, gatewayPort, selectedModelUniqId } = useAppSelector((state) => state.openclaw)
 
   const [error, setError] = useState<string | null>(null)
-  const [isInstalled, setIsInstalled] = useState<boolean | null>(null) // null = unknown, checking in background
+  const [isInstalled, setIsInstalled] = useState<boolean | null>(null)
+  const [isConnectionConfigLoaded, setIsConnectionConfigLoaded] = useState(false)
   const [needsMigration, setNeedsMigration] = useState(false)
   const [installPath, setInstallPath] = useState<string | null>(null)
   const [installError, setInstallError] = useState<string | null>(null)
+  const [connectionMode, setConnectionMode] = useState<ConnectionMode>('local')
+  const [remoteUrl, setRemoteUrl] = useState('')
+  const [remoteToken, setRemoteToken] = useState('')
+  const [remotePassword, setRemotePassword] = useState('')
+  const [controlUiBasePath, setControlUiBasePath] = useState('')
 
-  // Separate loading states for each action
   const [isInstalling, setIsInstalling] = useState(false)
   const [isUninstalling, setIsUninstalling] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
-  // Install progress logs
   const [installLogs, setInstallLogs] = useState<Array<{ message: string; type: 'info' | 'warn' | 'error' }>>([])
   const [showLogs, setShowLogs] = useState(false)
   const [uninstallSuccess, setUninstallSuccess] = useState(false)
@@ -96,29 +113,30 @@ const OpenClawPage: FC = () => {
     if (!selectedModelUniqId) return null
     try {
       const parsed = JSON.parse(selectedModelUniqId) as { id: string; provider: string }
-      for (const p of availableProviders) {
-        const model = p.models.find((m) => m.id === parsed.id && m.provider === parsed.provider)
+      for (const provider of availableProviders) {
+        const model = provider.models.find((item) => item.id === parsed.id && item.provider === parsed.provider)
         if (model) {
-          return { provider: p, model }
+          return { provider, model }
         }
       }
     } catch {
-      // Invalid JSON
+      return null
     }
     return null
   }, [selectedModelUniqId, availableProviders])
 
   const selectedProvider = selectedModelInfo?.provider ?? null
   const selectedModel = selectedModelInfo?.model ?? null
+  const isRemoteMode = connectionMode === 'remote'
 
   type PageState = 'checking' | 'not_installed' | 'installed' | 'installing' | 'uninstalling'
   const pageState: PageState = useMemo(() => {
     if (isUninstalling) return 'uninstalling'
     if (isInstalling) return 'installing'
-    if (isInstalled === null) return 'checking'
-    if (isInstalled) return 'installed'
+    if (isInstalled === null || !isConnectionConfigLoaded) return 'checking'
+    if (isInstalled || isRemoteMode) return 'installed'
     return 'not_installed'
-  }, [isInstalled, isInstalling, isUninstalling])
+  }, [isConnectionConfigLoaded, isInstalled, isInstalling, isRemoteMode, isUninstalling])
 
   const checkInstallation = useCallback(async () => {
     try {
@@ -132,6 +150,22 @@ const OpenClawPage: FC = () => {
       setIsInstalled(false)
     }
   }, [])
+
+  const loadConnectionConfig = useCallback(async () => {
+    try {
+      const result = (await window.api.openclaw.getConnectionConfig()) as OpenClawConnectionConfig
+      setConnectionMode(result.mode)
+      setRemoteUrl(result.remoteUrl)
+      setRemoteToken(result.remoteToken)
+      setRemotePassword(result.remotePassword)
+      setControlUiBasePath(result.controlUiBasePath)
+      dispatch(setGatewayPort(result.gatewayPort))
+    } catch (err) {
+      logger.error('Failed to load OpenClaw connection config', err as Error)
+    } finally {
+      setIsConnectionConfigLoaded(true)
+    }
+  }, [dispatch])
 
   const handleInstall = useCallback(async () => {
     setIsInstalling(true)
@@ -154,10 +188,9 @@ const OpenClawPage: FC = () => {
   }, [checkInstallation])
 
   const handleUninstall = useCallback(async () => {
-    // Use window.confirm for confirmation
     const confirmed = window.confirm(t('openclaw.uninstall_confirm'))
     if (!confirmed) {
-      return // User cancelled
+      return
     }
 
     setIsUninstalling(true)
@@ -189,9 +222,6 @@ const OpenClawPage: FC = () => {
     }
   }, [uninstallSuccess])
 
-  // Poll gateway status every 5s (only when installed).
-  // useSWR handles deduplication and stable polling without the infinite-loop
-  // pitfall of setInterval + dispatch in useEffect deps.
   const isInstallPage = pageState === 'installed'
 
   useSWR(
@@ -215,10 +245,9 @@ const OpenClawPage: FC = () => {
   )
 
   useEffect(() => {
-    void checkInstallation()
-  }, [checkInstallation])
+    void Promise.all([checkInstallation(), loadConnectionConfig()])
+  }, [checkInstallation, loadConnectionConfig])
 
-  // Listen for install progress events
   useEffect(() => {
     const cleanup = window.electron.ipcRenderer.on(
       IpcChannel.OpenClaw_InstallProgress,
@@ -234,8 +263,13 @@ const OpenClawPage: FC = () => {
   }
 
   const handleStartGateway = async () => {
-    if (!selectedProvider || !selectedModel) {
+    if (!isRemoteMode && (!selectedProvider || !selectedModel)) {
       setError(t('openclaw.error.select_provider_model'))
+      return
+    }
+
+    if (isRemoteMode && !remoteUrl.trim()) {
+      setError(t('openclaw.error.remote_url_required'))
       return
     }
 
@@ -243,25 +277,38 @@ const OpenClawPage: FC = () => {
     setError(null)
 
     try {
-      // First sync the configuration (auth token will be auto-generated in main process)
-      const syncResult = await window.api.openclaw.syncConfig(selectedProvider, selectedModel)
-      if (!syncResult.success) {
-        setError(syncResult.message)
+      const connectionResult = await window.api.openclaw.saveConnectionConfig({
+        mode: connectionMode,
+        gatewayPort,
+        controlUiBasePath,
+        remoteUrl,
+        remoteToken,
+        remotePassword,
+        remoteTransport: 'direct'
+      })
+      if (!connectionResult.success) {
+        setError(connectionResult.message)
         setIsStarting(false)
         return
       }
 
-      // Then start the gateway
-      const startResult = await window.api.openclaw.startGateway(gatewayPort)
+      if (!isRemoteMode) {
+        const syncResult = await window.api.openclaw.syncConfig(selectedProvider!, selectedModel!)
+        if (!syncResult.success) {
+          setError(syncResult.message)
+          setIsStarting(false)
+          return
+        }
+      }
+
+      const startResult = await window.api.openclaw.startGateway(isRemoteMode ? undefined : gatewayPort)
       if (!startResult.success) {
         setError(startResult.message)
         setIsStarting(false)
         return
       }
 
-      // Auto open dashboard first
       const dashboardUrl = await window.api.openclaw.getDashboardUrl()
-
       openSmartMinapp({
         id: 'openclaw-dashboard',
         name: 'OpenClaw',
@@ -269,7 +316,6 @@ const OpenClawPage: FC = () => {
         logo: OpenClawLogo
       })
 
-      // Delay 500ms before updating UI state (wait for minapp animation)
       setTimeout(() => {
         dispatch(setGatewayStatus('running'))
         setIsStarting(false)
@@ -338,6 +384,94 @@ const OpenClawPage: FC = () => {
     </div>
   )
 
+  const renderConnectionSection = () => (
+    <div className="mb-6">
+      <div className="mb-2 flex items-center gap-2 font-medium text-sm" style={{ color: 'var(--color-text-1)' }}>
+        {t('openclaw.connection.title')}
+      </div>
+      <Radio.Group
+        optionType="button"
+        buttonStyle="solid"
+        value={connectionMode}
+        onChange={(event) => setConnectionMode(event.target.value as ConnectionMode)}>
+        <Radio.Button value="local">{t('openclaw.connection.local')}</Radio.Button>
+        <Radio.Button value="remote">{t('openclaw.connection.remote')}</Radio.Button>
+      </Radio.Group>
+      <div className="mt-1 text-xs" style={{ color: 'var(--color-text-3)' }}>
+        {t(isRemoteMode ? 'openclaw.connection.remote_hint' : 'openclaw.connection.local_hint')}
+      </div>
+    </div>
+  )
+
+  const renderGatewayConfigSection = () => {
+    if (!isRemoteMode) {
+      return (
+        <>
+          <div className="mb-2 flex items-center gap-2 font-medium text-sm" style={{ color: 'var(--color-text-1)' }}>
+            {t('openclaw.model_config.model')}
+          </div>
+          <ModelSelector
+            style={{ width: '100%' }}
+            placeholder={t('openclaw.model_config.select_model')}
+            providers={availableProviders}
+            value={selectedModelUniqId}
+            onChange={handleModelSelect}
+            grouped
+            showAvatar
+            showSuffix
+          />
+          <div className="mt-1 text-xs" style={{ color: 'var(--color-text-3)' }}>
+            {t('openclaw.model_config.sync_hint')}
+          </div>
+        </>
+      )
+    }
+
+    return (
+      <>
+        <div className="mb-2 flex items-center gap-2 font-medium text-sm" style={{ color: 'var(--color-text-1)' }}>
+          {t('openclaw.connection.remote_url')}
+        </div>
+        <Input
+          value={remoteUrl}
+          onChange={(event) => setRemoteUrl(event.target.value)}
+          placeholder={t('openclaw.connection.remote_url_placeholder')}
+        />
+
+        <div className="mt-4 mb-2 flex items-center gap-2 font-medium text-sm" style={{ color: 'var(--color-text-1)' }}>
+          {t('openclaw.connection.control_ui_base_path')}
+        </div>
+        <Input
+          value={controlUiBasePath}
+          onChange={(event) => setControlUiBasePath(event.target.value)}
+          placeholder={t('openclaw.connection.control_ui_base_path_placeholder')}
+        />
+
+        <div className="mt-4 mb-2 flex items-center gap-2 font-medium text-sm" style={{ color: 'var(--color-text-1)' }}>
+          {t('openclaw.connection.remote_token')}
+        </div>
+        <Input.Password
+          value={remoteToken}
+          onChange={(event) => setRemoteToken(event.target.value)}
+          placeholder={t('openclaw.connection.remote_token_placeholder')}
+        />
+
+        <div className="mt-4 mb-2 flex items-center gap-2 font-medium text-sm" style={{ color: 'var(--color-text-1)' }}>
+          {t('openclaw.connection.remote_password')}
+        </div>
+        <Input.Password
+          value={remotePassword}
+          onChange={(event) => setRemotePassword(event.target.value)}
+          placeholder={t('openclaw.connection.remote_password_placeholder')}
+        />
+
+        <div className="mt-1 text-xs" style={{ color: 'var(--color-text-3)' }}>
+          {t('openclaw.connection.remote_auth_hint')}
+        </div>
+      </>
+    )
+  }
+
   const renderNotInstalledContent = () => (
     <div id="content-container" className="flex flex-1 flex-col overflow-y-auto py-5">
       <div className="flex-1" />
@@ -386,8 +520,7 @@ const OpenClawPage: FC = () => {
       <div className="m-auto min-h-fit w-130">
         <TitleSection title={t('openclaw.title')} description={t('openclaw.description')} clickable docsUrl={docsUrl} />
 
-        {/* Install Path - hide when gateway is running */}
-        {installPath && gatewayStatus !== 'running' && (
+        {installPath && gatewayStatus !== 'running' && !isRemoteMode && (
           <div
             className="mb-6 flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm"
             style={{ background: 'var(--color-background-soft)', color: 'var(--color-text-3)' }}>
@@ -406,9 +539,9 @@ const OpenClawPage: FC = () => {
                     try {
                       await navigator.clipboard.writeText(installPath)
                       window.toast.success(t('common.copied'))
-                    } catch (error) {
+                    } catch (err) {
                       window.toast.error(t('common.copy_failed'))
-                      logger.error('Failed to copy install path:', error as Error)
+                      logger.error('Failed to copy install path:', err as Error)
                     }
                   }}
                 />
@@ -424,7 +557,6 @@ const OpenClawPage: FC = () => {
           </div>
         )}
 
-        {/* Gateway Status Card - show when running */}
         {gatewayStatus === 'running' && (
           <div
             className="mb-6 flex items-center justify-between rounded-lg p-3"
@@ -432,26 +564,33 @@ const OpenClawPage: FC = () => {
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-green-500" />
               <span className="font-medium text-sm" style={{ color: 'var(--color-text-1)' }}>
-                {t('openclaw.status.running')}
+                {t(isRemoteMode ? 'openclaw.status.connected' : 'openclaw.status.running')}
               </span>
-              <span className="font-mono text-[13px]" style={{ color: 'var(--color-text-3)' }}>
-                :{gatewayPort}
-              </span>
+              {isRemoteMode ? (
+                <span className="max-w-80 truncate font-mono text-[13px]" style={{ color: 'var(--color-text-3)' }}>
+                  {remoteUrl}
+                </span>
+              ) : (
+                <span className="font-mono text-[13px]" style={{ color: 'var(--color-text-3)' }}>
+                  :{gatewayPort}
+                </span>
+              )}
             </div>
-            <Button
-              size="small"
-              type="text"
-              icon={<Square size={14} />}
-              onClick={handleStopGateway}
-              loading={isStopping}
-              disabled={isStopping}
-              danger>
-              {t('openclaw.gateway.stop')}
-            </Button>
+            {!isRemoteMode && (
+              <Button
+                size="small"
+                type="text"
+                icon={<Square size={14} />}
+                onClick={handleStopGateway}
+                loading={isStopping}
+                disabled={isStopping}
+                danger>
+                {t('openclaw.gateway.stop')}
+              </Button>
+            )}
           </div>
         )}
 
-        {/* Error Alert */}
         {error && (
           <div className="mb-6">
             <Alert
@@ -467,7 +606,7 @@ const OpenClawPage: FC = () => {
                       try {
                         await navigator.clipboard.writeText(error)
                         window.toast.success(t('common.copied'))
-                      } catch (err) {
+                      } catch {
                         window.toast.error(t('common.copy_failed'))
                       }
                     }}
@@ -482,27 +621,12 @@ const OpenClawPage: FC = () => {
           </div>
         )}
 
-        {/* Model Selector - only show when not running */}
+        {gatewayStatus !== 'running' && renderConnectionSection()}
+
         {gatewayStatus !== 'running' && (
           <div className="mb-6">
-            <div className="mb-2 flex items-center gap-2 font-medium text-sm" style={{ color: 'var(--color-text-1)' }}>
-              {t('openclaw.model_config.model')}
-            </div>
-            <ModelSelector
-              style={{ width: '100%' }}
-              placeholder={t('openclaw.model_config.select_model')}
-              providers={availableProviders}
-              value={selectedModelUniqId}
-              onChange={handleModelSelect}
-              grouped
-              showAvatar
-              showSuffix
-            />
-            <div className="mt-1 text-xs" style={{ color: 'var(--color-text-3)' }}>
-              {t('openclaw.model_config.sync_hint')}
-            </div>
+            {renderGatewayConfigSection()}
 
-            {/* Tips about OpenClaw */}
             <div
               className="mt-4 rounded-lg p-3 text-xs leading-relaxed"
               style={{ background: 'var(--color-background-mute)', color: 'var(--color-text-3)' }}>
@@ -524,7 +648,13 @@ const OpenClawPage: FC = () => {
             onClick={handleStartGateway}
             loading={isStarting || gatewayStatus === 'starting'}
             disabled={
-              !selectedProvider || !selectedModel || isStarting || gatewayStatus === 'starting' || isOpenClawUpdating
+              isRemoteMode
+                ? !remoteUrl.trim() || isStarting || gatewayStatus === 'starting'
+                : !selectedProvider ||
+                  !selectedModel ||
+                  isStarting ||
+                  gatewayStatus === 'starting' ||
+                  isOpenClawUpdating
             }
             size="large"
             block>
@@ -549,7 +679,6 @@ const OpenClawPage: FC = () => {
     </div>
   )
 
-  // Render uninstalling page - only show logs
   const renderUninstallingContent = () => (
     <div id="content-container" className="flex flex-1 overflow-y-auto py-5">
       <div className="m-auto min-h-fit w-130">

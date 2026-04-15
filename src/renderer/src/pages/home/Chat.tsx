@@ -38,6 +38,7 @@ interface Props {
   activeTopic: Topic
   setActiveTopic: (topic: Topic) => void
   setActiveAssistant: (assistant: Assistant) => void
+  initialPrompt?: string
 }
 
 const Chat: FC<Props> = (props) => {
@@ -193,7 +194,12 @@ const Chat: FC<Props> = (props) => {
                   onIncludeUserChange={userOutlinedItemClickHandler}
                 />
                 {messageNavigation === 'buttons' && <ChatNavigation containerId="messages" />}
-                <Inputbar assistant={assistant} setActiveTopic={props.setActiveTopic} topic={props.activeTopic} />
+                <Inputbar
+                  assistant={assistant}
+                  setActiveTopic={props.setActiveTopic}
+                  topic={props.activeTopic}
+                  initialPrompt={props.initialPrompt}
+                />
                 {isMultiSelectMode && <MultiSelectActionPopup topic={props.activeTopic} />}
               </div>
             </QuickPanelProvider>

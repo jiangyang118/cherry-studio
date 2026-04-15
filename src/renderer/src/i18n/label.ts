@@ -196,6 +196,7 @@ const sidebarIconKeyMap = {
   files: 'files.title',
   code_tools: 'code.title',
   notes: 'notes.title',
+  hermes: 'hermes.title',
   openclaw: 'openclaw.title'
 } as const
 

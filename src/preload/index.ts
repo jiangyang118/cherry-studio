@@ -78,6 +78,16 @@ interface OpenClawChannelInfo {
   status: 'connected' | 'disconnected' | 'error'
 }
 
+interface OpenClawConnectionConfig {
+  mode: 'local' | 'remote'
+  gatewayPort: number
+  controlUiBasePath: string
+  remoteUrl: string
+  remoteToken: string
+  remotePassword: string
+  remoteTransport: 'ssh' | 'direct'
+}
+
 type HermesGatewayStatus = 'stopped' | 'starting' | 'running' | 'error'
 
 interface HermesInstallInfo {
@@ -104,6 +114,9 @@ interface HermesHealthInfo {
   pid: number | null
   platforms: HermesPlatformInfo[]
 }
+
+type HermesCommandId = 'statusDeep' | 'doctor' | 'sessionsList' | 'logsErrors' | 'logsGateway'
+type HermesTerminalActionId = 'chat' | 'setup' | 'gatewaySetup' | 'model' | 'skills' | 'sessionsBrowse'
 
 type DirectoryListOptions = {
   recursive?: boolean
@@ -851,6 +864,10 @@ const api = {
       ipcRenderer.invoke(IpcChannel.OpenClaw_GetStatus),
     checkHealth: (): Promise<OpenClawHealthInfo> => ipcRenderer.invoke(IpcChannel.OpenClaw_CheckHealth),
     getDashboardUrl: (): Promise<string> => ipcRenderer.invoke(IpcChannel.OpenClaw_GetDashboardUrl),
+    getConnectionConfig: (): Promise<OpenClawConnectionConfig> =>
+      ipcRenderer.invoke(IpcChannel.OpenClaw_GetConnectionConfig),
+    saveConnectionConfig: (config: OpenClawConnectionConfig): Promise<OperationResult> =>
+      ipcRenderer.invoke(IpcChannel.OpenClaw_SaveConnectionConfig, config),
     syncConfig: (provider: Provider, primaryModel: Model): Promise<OperationResult> =>
       ipcRenderer.invoke(IpcChannel.OpenClaw_SyncConfig, provider, primaryModel),
     getChannels: (): Promise<OpenClawChannelInfo[]> => ipcRenderer.invoke(IpcChannel.OpenClaw_GetChannels),
@@ -874,7 +891,21 @@ const api = {
     }> => ipcRenderer.invoke(IpcChannel.Hermes_GetStatus),
     checkHealth: (): Promise<HermesHealthInfo> => ipcRenderer.invoke(IpcChannel.Hermes_CheckHealth),
     getPlatforms: (): Promise<HermesPlatformInfo[]> => ipcRenderer.invoke(IpcChannel.Hermes_GetPlatforms),
-    getDocsUrl: (): Promise<string> => ipcRenderer.invoke(IpcChannel.Hermes_GetDocsUrl)
+    getDocsUrl: (): Promise<string> => ipcRenderer.invoke(IpcChannel.Hermes_GetDocsUrl),
+    runCommand: (
+      id: HermesCommandId
+    ): Promise<{
+      success: boolean
+      id: HermesCommandId
+      label: string
+      command: string
+      exitCode: number | null
+      stdout: string
+      stderr: string
+      durationMs: number
+    }> => ipcRenderer.invoke(IpcChannel.Hermes_RunCommand, id),
+    openInTerminal: (id: HermesTerminalActionId): Promise<OperationResult> =>
+      ipcRenderer.invoke(IpcChannel.Hermes_OpenInTerminal, id)
   },
   analytics: {
     trackTokenUsage: (data: TokenUsageData) => ipcRenderer.invoke(IpcChannel.Analytics_TrackTokenUsage, data)

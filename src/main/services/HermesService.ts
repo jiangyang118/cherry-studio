@@ -47,6 +47,20 @@ export interface HermesGatewayInfo {
   message?: string
 }
 
+export type HermesCommandId = 'statusDeep' | 'doctor' | 'sessionsList' | 'logsErrors' | 'logsGateway'
+export type HermesTerminalActionId = 'chat' | 'setup' | 'gatewaySetup' | 'model' | 'skills' | 'sessionsBrowse'
+
+export interface HermesCommandResult {
+  success: boolean
+  id: HermesCommandId
+  label: string
+  command: string
+  exitCode: number | null
+  stdout: string
+  stderr: string
+  durationMs: number
+}
+
 interface HermesRuntimeStatusFile {
   gateway_state?: string
   exit_reason?: string | null
@@ -123,6 +137,8 @@ class HermesService {
     this.startGateway = this.startGateway.bind(this)
     this.stopGateway = this.stopGateway.bind(this)
     this.getDocsUrl = this.getDocsUrl.bind(this)
+    this.runCommand = this.runCommand.bind(this)
+    this.openInTerminal = this.openInTerminal.bind(this)
   }
 
   private getVenvPath(): string | null {
@@ -236,6 +252,114 @@ class HermesService {
     })
   }
 
+  private getCommandConfig(id: HermesCommandId): { args: string[]; timeoutMs: number; label: string } {
+    switch (id) {
+      case 'statusDeep':
+        return { args: ['status', '--deep'], timeoutMs: 30000, label: 'Hermes Status' }
+      case 'doctor':
+        return { args: ['doctor'], timeoutMs: 30000, label: 'Hermes Doctor' }
+      case 'sessionsList':
+        return { args: ['sessions', 'list', '--limit', '10'], timeoutMs: 20000, label: 'Recent Sessions' }
+      case 'logsErrors':
+        return { args: ['logs', 'errors', '-n', '50'], timeoutMs: 20000, label: 'Errors Log' }
+      case 'logsGateway':
+        return { args: ['logs', 'gateway', '-n', '50'], timeoutMs: 20000, label: 'Gateway Log' }
+    }
+  }
+
+  private getTerminalActionConfig(id: HermesTerminalActionId): { args: string[]; title: string } {
+    switch (id) {
+      case 'chat':
+        return { args: [], title: 'Hermes Chat' }
+      case 'setup':
+        return { args: ['setup'], title: 'Hermes Setup' }
+      case 'gatewaySetup':
+        return { args: ['gateway', 'setup'], title: 'Hermes Gateway Setup' }
+      case 'model':
+        return { args: ['model'], title: 'Hermes Model Selector' }
+      case 'skills':
+        return { args: ['skills', 'browse'], title: 'Hermes Skills Hub' }
+      case 'sessionsBrowse':
+        return { args: ['sessions', 'browse'], title: 'Hermes Sessions Browser' }
+    }
+  }
+
+  private shellEscape(value: string): string {
+    return `'${value.replace(/'/g, `'\\''`)}'`
+  }
+
+  private writeTerminalLauncherScript(title: string, commandLine: string): string {
+    const scriptsDir = path.join(os.tmpdir(), 'cherrystudio-hermes')
+    fs.mkdirSync(scriptsDir, { recursive: true })
+    const scriptPath = path.join(scriptsDir, `hermes-${Date.now()}.command`)
+    const content = [
+      '#!/bin/zsh',
+      '',
+      `cd ${this.shellEscape(HERMES_REPO_PATH)} || exit 1`,
+      `source ${this.shellEscape(path.join(HERMES_REPO_PATH, 'venv', 'bin', 'activate'))} 2>/dev/null || source ${this.shellEscape(path.join(HERMES_REPO_PATH, '.venv', 'bin', 'activate'))} 2>/dev/null || true`,
+      'clear',
+      `echo ${this.shellEscape(title)}`,
+      'echo',
+      commandLine,
+      '',
+      'status=$?',
+      'echo',
+      'echo "Command finished with status: $status"',
+      'exec zsh'
+    ].join('\n')
+
+    fs.writeFileSync(scriptPath, content, 'utf8')
+    fs.chmodSync(scriptPath, 0o755)
+    return scriptPath
+  }
+
+  private async openScriptInTerminal(scriptPath: string): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      if (process.platform === 'darwin') {
+        const appleScript = [
+          'tell application "iTerm"',
+          'activate',
+          'set newWindow to (create window with default profile)',
+          `tell current session of newWindow to write text ${JSON.stringify(this.shellEscape(scriptPath))}`,
+          'end tell'
+        ]
+
+        const proc = spawn(
+          'osascript',
+          appleScript.flatMap((line) => ['-e', line]),
+          {
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: true
+          }
+        )
+
+        proc.on('error', reject)
+        proc.unref()
+        resolve()
+        return
+      }
+
+      let opener = 'open'
+      let args = [scriptPath]
+
+      if (process.platform === 'win32') {
+        opener = 'cmd.exe'
+        args = ['/c', 'start', '', scriptPath]
+      }
+
+      const proc = spawn(opener, args, {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true
+      })
+
+      proc.on('error', reject)
+      proc.unref()
+      resolve()
+    })
+  }
+
   public async checkInstalled(): Promise<HermesInstallInfo> {
     const issues: string[] = []
 
@@ -346,6 +470,62 @@ class HermesService {
 
   public async getDocsUrl(): Promise<string> {
     return 'https://hermes-agent.nousresearch.com/docs/'
+  }
+
+  public async runCommand(_: Electron.IpcMainInvokeEvent, id: HermesCommandId): Promise<HermesCommandResult> {
+    const installInfo = await this.checkInstalled()
+    const commandConfig = this.getCommandConfig(id)
+
+    if (!installInfo.available) {
+      return {
+        success: false,
+        id,
+        label: commandConfig.label,
+        command: `hermes ${commandConfig.args.join(' ')}`,
+        exitCode: null,
+        stdout: '',
+        stderr: installInfo.issues.join('. '),
+        durationMs: 0
+      }
+    }
+
+    const startedAt = Date.now()
+    const result = await this.execHermesCommand(commandConfig.args, commandConfig.timeoutMs)
+
+    return {
+      success: result.code === 0,
+      id,
+      label: commandConfig.label,
+      command: `hermes ${commandConfig.args.join(' ')}`.trim(),
+      exitCode: result.code,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      durationMs: Date.now() - startedAt
+    }
+  }
+
+  public async openInTerminal(_: Electron.IpcMainInvokeEvent, id: HermesTerminalActionId): Promise<OperationResult> {
+    const installInfo = await this.checkInstalled()
+    if (!installInfo.available) {
+      return {
+        success: false,
+        message: installInfo.issues.join('. ')
+      }
+    }
+
+    try {
+      const action = this.getTerminalActionConfig(id)
+      const command = [this.shellEscape(installInfo.cliPath!), ...action.args.map((arg) => this.shellEscape(arg))].join(
+        ' '
+      )
+      const scriptPath = this.writeTerminalLauncherScript(action.title, command)
+      await this.openScriptInTerminal(scriptPath)
+      return { success: true }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      logger.error('Failed to open Hermes terminal action', error as Error)
+      return { success: false, message }
+    }
   }
 }
 

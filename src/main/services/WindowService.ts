@@ -5,6 +5,7 @@ import { is } from '@electron-toolkit/utils'
 import { loggerService } from '@logger'
 import { isDev, isLinux, isMac, isWin } from '@main/constant'
 import { getFilesDir } from '@main/utils/file'
+import { getSafeWindowState } from '@main/utils/windowState'
 import { getWindowsBackgroundMaterial } from '@main/utils/windowUtil'
 import { MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH } from '@shared/config/constant'
 import { IpcChannel } from '@shared/IpcChannel'
@@ -58,6 +59,8 @@ export class WindowService {
       fullScreen: false,
       maximize: false
     })
+    const safeMainWindowState = getSafeWindowState(mainWindowState, screen.getAllDisplays(), screen.getPrimaryDisplay())
+
     const windowsBackgroundMaterial = getWindowsBackgroundMaterial()
     let mainWindowBackgroundColor: string | undefined
 
@@ -66,10 +69,10 @@ export class WindowService {
     }
 
     this.mainWindow = new BrowserWindow({
-      x: mainWindowState.x,
-      y: mainWindowState.y,
-      width: mainWindowState.width,
-      height: mainWindowState.height,
+      x: safeMainWindowState.x,
+      y: safeMainWindowState.y,
+      width: safeMainWindowState.width,
+      height: safeMainWindowState.height,
       minWidth: MIN_WINDOW_WIDTH,
       minHeight: MIN_WINDOW_HEIGHT,
       show: false,

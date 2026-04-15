@@ -687,6 +687,7 @@ export type SidebarIcon =
   | 'files'
   | 'code_tools'
   | 'notes'
+  | 'hermes'
   | 'openclaw'
 
 export type ExternalToolResult = {
