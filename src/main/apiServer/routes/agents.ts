@@ -1,6 +1,9 @@
 import { agentService } from '@data/services/AgentService'
 import { agentSessionService } from '@data/services/AgentSessionService'
 import { loggerService } from '@logger'
+import { sessionMessageOrchestrator } from '@main/services/agents/services/SessionMessageOrchestrator'
+import type { GetAgentSessionResponse } from '@types'
+import type { TextStreamPart } from 'ai'
 import type { Request, Response } from 'express'
 import express from 'express'
 
@@ -24,6 +27,91 @@ const invalidOrderedIds = (res: Response, resource: 'agent' | 'session') =>
     }
   })
 
+const sendAgentRouteError = (res: Response, status: number, message: string, code: string) => {
+  if (res.headersSent) {
+    res.write(`data: ${JSON.stringify({ type: 'error', error: { message, code } })}\n\n`)
+    res.end()
+    return
+  }
+
+  res.status(status).json({
+    success: false,
+    error: {
+      message,
+      type: status >= 500 ? 'server_error' : 'invalid_request',
+      code
+    }
+  })
+}
+
+async function writeStreamAsSSE(
+  stream: ReadableStream<TextStreamPart<Record<string, any>>>,
+  res: Response
+): Promise<void> {
+  const reader = stream.getReader()
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      res.write(`data: ${JSON.stringify(value)}\n\n`)
+    }
+
+    res.write('data: [DONE]\n\n')
+    res.end()
+  } finally {
+    reader.releaseLock()
+  }
+}
+
+export async function handleAgentSessionMessagePost(req: Request, res: Response) {
+  const { agentId, sessionId } = req.params
+  const content = typeof req.body?.content === 'string' ? req.body.content : ''
+
+  if (!content.trim()) {
+    sendAgentRouteError(res, 400, 'content must be a non-empty string', 'invalid_content')
+    return
+  }
+
+  const session = (await agentSessionService.getSession(agentId, sessionId)) as GetAgentSessionResponse | null
+  if (!session) {
+    sendAgentRouteError(res, 404, `Session ${sessionId} not found`, 'session_not_found')
+    return
+  }
+
+  const abortController = new AbortController()
+  res.on('close', () => {
+    if (!res.writableEnded) {
+      abortController.abort('client disconnected')
+    }
+  })
+
+  try {
+    const { stream, completion } = await sessionMessageOrchestrator.createSessionMessage(
+      session,
+      {
+        content,
+        ...(req.body?.effort ? { effort: req.body.effort } : {}),
+        ...(req.body?.thinking ? { thinking: req.body.thinking } : {})
+      },
+      abortController,
+      { persist: false }
+    )
+
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
+    res.setHeader('Cache-Control', 'no-cache, no-transform')
+    res.setHeader('Connection', 'keep-alive')
+    res.flushHeaders?.()
+
+    await writeStreamAsSSE(stream, res)
+    await completion
+  } catch (error) {
+    logger.error('Failed to stream agent session message through legacy HTTP route', error as Error)
+    const message = error instanceof Error ? error.message : 'Failed to stream agent session message'
+    sendAgentRouteError(res, 500, message, 'agent_message_stream_failed')
+  }
+}
+
 router.put('/reorder', async (req: Request, res: Response) => {
   try {
     const orderedIds = parseOrderedIds(req.body?.ordered_ids)
@@ -40,6 +128,8 @@ router.put('/reorder', async (req: Request, res: Response) => {
     })
   }
 })
+
+router.post('/:agentId/sessions/:sessionId/messages', handleAgentSessionMessagePost)
 
 router.put('/:agentId/sessions/reorder', async (req: Request, res: Response) => {
   try {
