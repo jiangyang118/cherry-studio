@@ -25,8 +25,6 @@ export const useCreateDefaultSession = (agentId: string | null) => {
     setCreatingSession(true)
     try {
       const session = {
-        ...agent,
-        id: undefined,
         name: t('common.unnamed')
       } satisfies CreateSessionForm
 

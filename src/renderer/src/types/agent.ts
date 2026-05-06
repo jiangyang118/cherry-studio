@@ -254,7 +254,7 @@ export type AgentForm = AddAgentForm | UpdateAgentForm
 
 export type BaseSessionForm = AgentBase
 
-export type CreateSessionForm = BaseSessionForm & { id?: never }
+export type CreateSessionForm = Partial<BaseSessionForm> & { id?: never }
 
 export type UpdateSessionForm = Partial<BaseSessionForm> & { id: string }
 

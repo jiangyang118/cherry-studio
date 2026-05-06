@@ -25,7 +25,7 @@ import {
   useInputbarToolsInternalDispatch,
   useInputbarToolsState
 } from '@renderer/pages/home/Inputbar/context/InputbarToolsProvider'
-import { getDefaultTopic, mapLegacyTopicToDto } from '@renderer/services/AssistantService'
+import { ensureLegacyTopicInDataApi, getDefaultTopic, mapLegacyTopicToDto } from '@renderer/services/AssistantService'
 import { EVENT_NAMES, EventEmitter } from '@renderer/services/EventService'
 import FileManager from '@renderer/services/FileManager'
 import { checkRateLimit, getUserMessage } from '@renderer/services/MessagesService'
@@ -245,17 +245,23 @@ const InputbarInner: FC<InputbarInnerProps> = ({ assistant: initialAssistant, se
     }
 
     logger.info('Starting to send message')
+    const sendTopic = scope === TopicType.Chat ? await ensureLegacyTopicInDataApi(topic) : topic
+
+    if (sendTopic.id !== topic.id) {
+      addTopic(sendTopic)
+      setActiveTopic(sendTopic)
+    }
 
     const parent = await spanManagerService.startTrace(
-      { topicId: topic.id, name: 'sendMessage', inputs: text },
+      { topicId: sendTopic.id, name: 'sendMessage', inputs: text },
       mentionedModels.length > 0 ? mentionedModels : [assistant.model]
     )
-    void EventEmitter.emit(EVENT_NAMES.SEND_MESSAGE, { topicId: topic.id, traceId: parent?.spanContext().traceId })
+    void EventEmitter.emit(EVENT_NAMES.SEND_MESSAGE, { topicId: sendTopic.id, traceId: parent?.spanContext().traceId })
 
     try {
       const uploadedFiles = await FileManager.uploadFiles(files)
 
-      const baseUserMessage: MessageInputBaseParams = { assistant, topic, content: text }
+      const baseUserMessage: MessageInputBaseParams = { assistant, topic: sendTopic, content: text }
       if (uploadedFiles) {
         baseUserMessage.files = uploadedFiles
       }
@@ -268,7 +274,7 @@ const InputbarInner: FC<InputbarInnerProps> = ({ assistant: initialAssistant, se
       const { message, blocks } = getUserMessage(baseUserMessage)
       message.traceId = parent?.spanContext().traceId
 
-      void dispatch(_sendMessage(message, blocks, assistant, topic.id))
+      void dispatch(_sendMessage(message, blocks, assistant, sendTopic.id))
 
       setText('')
       setFiles([])
@@ -282,11 +288,14 @@ const InputbarInner: FC<InputbarInnerProps> = ({ assistant: initialAssistant, se
     }
   }, [
     assistant,
+    addTopic,
     topic,
     text,
     mentionedModels,
     files,
     dispatch,
+    scope,
+    setActiveTopic,
     setText,
     setFiles,
     setTimeoutTimer,

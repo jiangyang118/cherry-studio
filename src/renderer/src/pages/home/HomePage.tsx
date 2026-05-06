@@ -1,14 +1,17 @@
 import { usePreference } from '@data/hooks/usePreference'
+import { loggerService } from '@logger'
 import { ErrorBoundary } from '@renderer/components/ErrorBoundary'
 import { useAssistants } from '@renderer/hooks/useAssistant'
 import { useNavbarPosition } from '@renderer/hooks/useNavbar'
 import { useShortcut } from '@renderer/hooks/useShortcuts'
 import { useShowAssistants, useShowTopics } from '@renderer/hooks/useStore'
 import { useActiveTopic } from '@renderer/hooks/useTopic'
+import { ensureLegacyTopicInDataApi } from '@renderer/services/AssistantService'
 import { EVENT_NAMES, EventEmitter } from '@renderer/services/EventService'
 import NavigationService from '@renderer/services/NavigationService'
+import { updateTopics } from '@renderer/store/assistants'
 import { newMessagesActions } from '@renderer/store/newMessage'
-import type { Assistant, Topic } from '@renderer/types'
+import { type Assistant, type Topic, TopicType } from '@renderer/types'
 import { MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, SECOND_MIN_WINDOW_WIDTH } from '@shared/config/constant'
 import { useLocation, useNavigate } from '@tanstack/react-router'
 import { AnimatePresence, motion } from 'motion/react'
@@ -20,6 +23,8 @@ import styled from 'styled-components'
 import Chat from './Chat'
 import Navbar from './Navbar'
 import HomeTabs from './Tabs'
+
+const logger = loggerService.withContext('HomePage')
 
 let _activeAssistant: Assistant
 
@@ -102,6 +107,36 @@ const HomePage: FC = () => {
     },
     [_setActiveTopic, dispatch]
   )
+
+  useEffect(() => {
+    if (!activeAssistant || !activeTopic || activeTopic.type === TopicType.Session) {
+      return
+    }
+
+    let cancelled = false
+
+    const ensureTopic = async () => {
+      const ensuredTopic = await ensureLegacyTopicInDataApi(activeTopic)
+      if (cancelled || ensuredTopic.id === activeTopic.id) {
+        return
+      }
+
+      const topics = [
+        ensuredTopic,
+        ...(activeAssistant.topics ?? []).filter((topic) => topic.id !== activeTopic.id && topic.id !== ensuredTopic.id)
+      ]
+      dispatch(updateTopics({ assistantId: activeAssistant.id, topics }))
+      setActiveTopic(ensuredTopic)
+    }
+
+    ensureTopic().catch((error) => {
+      logger.error('Failed to ensure active topic in Data API', error as Error)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeAssistant, activeTopic, dispatch, setActiveTopic])
 
   useEffect(() => {
     NavigationService.setNavigate(navigate)

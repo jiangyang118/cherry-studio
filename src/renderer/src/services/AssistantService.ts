@@ -1,3 +1,4 @@
+import { dataApiService } from '@data/DataApiService'
 import { preferenceService } from '@data/PreferenceService'
 import { loggerService } from '@logger'
 import {
@@ -24,7 +25,9 @@ import type {
   TranslateAssistant,
   TranslateLanguage
 } from '@renderer/types'
+import { ErrorCode } from '@shared/data/api/apiErrors'
 import type { CreateTopicDto } from '@shared/data/api/schemas/topics'
+import type { Topic as DataApiTopic } from '@shared/data/types/topic'
 import { v4 as uuid } from 'uuid'
 
 const logger = loggerService.withContext('AssistantService')
@@ -178,9 +181,40 @@ export function getDefaultTopic(assistantId: string): Topic {
 // TODO: remove it in v2
 export function mapLegacyTopicToDto(topic: Topic): CreateTopicDto {
   return {
-    name: topic.name,
-    assistantId: topic.assistantId
+    name: topic.name
   }
+}
+
+function mapDataApiTopicToLegacyTopic(topic: DataApiTopic, fallback: Topic): Topic {
+  return {
+    ...fallback,
+    id: topic.id,
+    assistantId: topic.assistantId ?? fallback.assistantId,
+    name: topic.name,
+    createdAt: topic.createdAt,
+    updatedAt: topic.updatedAt,
+    messages: fallback.messages ?? [],
+    isNameManuallyEdited: topic.isNameManuallyEdited
+  }
+}
+
+export async function ensureLegacyTopicInDataApi(topic: Topic): Promise<Topic> {
+  try {
+    const existing = await dataApiService.get(`/topics/${topic.id}`)
+    return mapDataApiTopicToLegacyTopic(existing, topic)
+  } catch (error: any) {
+    if (error?.code !== ErrorCode.NOT_FOUND) {
+      throw error
+    }
+  }
+
+  const created = await dataApiService.post('/topics', {
+    body: mapLegacyTopicToDto(topic)
+  })
+
+  logger.info('Created missing legacy topic in Data API', { legacyTopicId: topic.id, topicId: created.id })
+
+  return mapDataApiTopicToLegacyTopic(created, topic)
 }
 
 export function getDefaultProvider() {
